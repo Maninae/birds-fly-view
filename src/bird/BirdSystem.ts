@@ -29,7 +29,13 @@ import { CameraRig } from './camera.js';
 import { newFlightMemory, stepFlight } from './flight.js';
 import type { FlightMemory, FlightStepResult } from './flight.js';
 import { BirdMesh } from './mesh.js';
-import { CRUISE_SPEED, LAND_EASE_SEC, LAND_HEIGHT } from './tuning.js';
+import {
+  CRUISE_SPEED,
+  LAND_ARC_LIFT,
+  LAND_EASE_SEC,
+  LAND_FLARE_PITCH,
+  LAND_HEIGHT,
+} from './tuning.js';
 import { newWalkMemory, stepWalk } from './walk.js';
 import type { WalkMemory } from './walk.js';
 
@@ -70,6 +76,13 @@ export class BirdSystem implements BirdSystemApi {
       speed: CRUISE_SPEED,
       flapPhase: 0,
     };
+
+    // Dev-time diagnostic hook (dev builds only). Lets integration tests observe
+    // pose + mode without threading state through the coordinator. Vite tree-
+    // shakes the branch in production because the constant flips to false.
+    if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+      (window as unknown as { __bfvBird?: BirdSystem }).__bfvBird = this;
+    }
   }
 
   get mode(): AppMode {
@@ -172,14 +185,23 @@ export class BirdSystem implements BirdSystemApi {
 
   private tickEase(dt: number): void {
     this.easeT -= dt;
-    const p = 1 - Math.max(0, this.easeT / LAND_EASE_SEC);
-    // Ease-out cubic — a soft settle.
+    const p = 1 - Math.max(0, this.easeT / LAND_EASE_SEC);   // 0..1 progress
+    // Ease-out cubic on the position so touchdown is soft.
     const k = 1 - Math.pow(1 - p, 3);
+    // Arc/flare curve: 0 → 1 → 0 over the ease, peaks at p=0.5.
+    // Adds a slight upward lift and a nose-up flare that reads as "committed".
+    const arc = Math.sin(p * Math.PI);
+
     this.pose.position.lerpVectors(this.easeFrom, this.easeTo, k);
-    // Level out orientation during ease.
-    this.pose.pitch *= (1 - k);
+    this.pose.position.y += arc * LAND_ARC_LIFT;
+
+    // Nose up during the swoop, then level for touchdown.
+    this.pose.pitch = arc * LAND_FLARE_PITCH;
+    // Wings out (roll decays), speed bleeds to zero.
     this.pose.roll *= (1 - k);
     this.pose.speed *= (1 - k);
+    // Wings ~one visible spread during the swoop.
+    this.pose.flapPhase = (this.pose.flapPhase + dt * 1.5) % 1;
 
     if (this.easeT <= 0) {
       this.easeT = 0;
@@ -200,9 +222,9 @@ export class BirdSystem implements BirdSystemApi {
   }
 
   private beginTakeoff(): void {
-    // Reset flight memory and pop up a bit so the very-next flight tick
-    // doesn't immediately re-detect a landing candidate.
-    this.pose.position.y += LAND_HEIGHT * 0.6;
+    // Reset flight memory and pop up ABOVE the landing-detection window so
+    // the very-next flight tick doesn't spuriously re-detect a candidate.
+    this.pose.position.y += LAND_HEIGHT * 1.2;
     this.pose.speed = CRUISE_SPEED * 0.7;
     this.pose.pitch = 0.1;   // slight climb
     this.pose.roll = 0;

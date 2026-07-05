@@ -30,9 +30,14 @@ export const FLAP_LIFT_IMPULSE = 4.5;   // m/s vertical add per beat
 export const FLAP_FWD_IMPULSE = 1.5;    // m/s along-heading add per beat
 export const FLAP_TAP_LIFT = 3.0;       // single-press (edge) lift bonus
 
-// Brake: mushes speed down, slight extra sink.
+// Brake: mushes speed down, extra sink so a committed brake feels like
+// a bird spreading its wings to airbrake, not just slowing on level.
 export const BRAKE_DECEL = 8.0;         // m/s²
-export const BRAKE_EXTRA_SINK = 1.5;    // m/s
+export const BRAKE_EXTRA_SINK = 4.0;    // m/s (was 1.5 — landing was unreachable)
+/** Below this altitude, brake bites harder on BOTH speed AND sink — birds
+ *  air-brake when committing. Multiplier scales BRAKE_DECEL and BRAKE_EXTRA_SINK. */
+export const BRAKE_LOW_ALT_THRESHOLD = 30;
+export const BRAKE_LOW_ALT_MULTIPLIER = 2.0;
 
 // -- Steering ---------------------------------------------------------------
 
@@ -61,10 +66,18 @@ export const FLARE_PITCH = Math.PI * 20 / 180;  // 20° up assist
 export const MAX_STEP_M = 4.0;   // if step > this, substep the update
 export const FORWARD_PROBE = 2.0; // meters ahead for wall check
 
-/** Landing eligibility while flying. */
-export const LAND_MAX_SPEED = 10;
-export const LAND_HEIGHT = 6.0;   // ground within this triggers candidate
-export const LAND_EASE_SEC = 0.4;
+/** Landing eligibility while flying. Generous by design — the whole point
+ *  is that landing on a rooftop should feel magical, not fiddly.
+ *  Same thresholds drive both the UI prompt and the E-assist swoop. */
+export const LAND_MAX_SPEED = 16;
+export const LAND_HEIGHT = 22;    // ground within this window triggers candidate
+export const LAND_EASE_SEC = 0.8; // longer swoop for a "settle" feel
+
+/** Peak pitch (rad) during the landing swoop — a flare that reads as intent. */
+export const LAND_FLARE_PITCH = Math.PI * 25 / 180;
+
+/** Extra upward arc lift (m) applied mid-swoop so the path curves in, not lerps. */
+export const LAND_ARC_LIFT = 0.6;
 
 // -- Walking ----------------------------------------------------------------
 

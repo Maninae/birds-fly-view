@@ -23,6 +23,8 @@ import {
   BANK_RATE,
   BRAKE_DECEL,
   BRAKE_EXTRA_SINK,
+  BRAKE_LOW_ALT_MULTIPLIER,
+  BRAKE_LOW_ALT_THRESHOLD,
   CLIMB_BLEED,
   CRUISE_SPEED,
   DIVE_ACCEL,
@@ -164,7 +166,14 @@ function advance(
   if (sinP > 0) dv -= sinP * CLIMB_BLEED * GRAVITY * 0.15;
   // Restore toward cruise.
   dv += (CRUISE_SPEED - pose.speed) * SPEED_RESTORE * 0.5;
-  if (input.brake) dv -= BRAKE_DECEL;
+  // Below BRAKE_LOW_ALT_THRESHOLD the airbrake bites harder on both axes
+  // — the player is committing to land and needs speed AND altitude to
+  // actually come down. Used again below for the sink term.
+  const brakeBoost = input.brake && altitude < BRAKE_LOW_ALT_THRESHOLD
+    ? BRAKE_LOW_ALT_MULTIPLIER : 1;
+  if (input.brake) {
+    dv -= BRAKE_DECEL * brakeBoost;
+  }
   pose.speed = clamp(pose.speed + dv * dt, MIN_AIRSPEED, MAX_AIRSPEED);
 
   // --- flap impulses ------------------------------------------------------
@@ -189,7 +198,7 @@ function advance(
 
   // Vertical velocity: energy-driven component + flap memory + level sink.
   let dy = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
-  if (input.brake) dy -= BRAKE_EXTRA_SINK;
+  if (input.brake) dy -= BRAKE_EXTRA_SINK * brakeBoost;
   dy *= dt;
 
   // Decay flap-lift memory back to zero.
