@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- warm parchment disc -->
+  <circle cx="32" cy="32" r="30" fill="#F5E3C8"/>
+  <!-- peach horizon glow -->
+  <circle cx="32" cy="38" r="20" fill="#F2B98F" opacity="0.55"/>
+  <!-- tiny bird silhouette in flight (an M-shaped seagull glyph) -->
+  <path
+    d="M12 34 C18 26 24 26 30 32 C36 26 42 26 48 34 C44 30 40 30 36 34 C34 32 30 32 28 34 C24 30 20 30 16 34 Z"
+    fill="#3A3730"
+  />
+  <!-- small trailing bird -->
+  <path
+    d="M40 22 C42 20 44 20 46 22 C45 21 44 21 43 22 C42 21 41 21 40 22 Z"
+    fill="#3A3730"
+    opacity="0.75"
+  />
+</svg>
