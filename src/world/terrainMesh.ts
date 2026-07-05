@@ -9,7 +9,7 @@
  * so `terrain.sample()` at each vertex is a synchronous cache hit.
  */
 import {
-  BufferGeometry, BufferAttribute, Color, Mesh, MeshLambertMaterial,
+  BufferGeometry, BufferAttribute, Color, Material, Mesh,
 } from 'three';
 import { EnuFrame, tileXToLon, tileYToLat } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
@@ -22,11 +22,15 @@ const GRID = 64;
  * Build a terrain-tile mesh spanning the z12 tile at (`tx`, `ty`).
  * Assumes elevations at the sample points are already loaded in `terrain`.
  * Silent no-op mesh (returns null) if none are loaded.
+ *
+ * `material` is coordinator-owned so all terrain tiles share ONE material —
+ * a per-tile allocation used to leak on eviction (only geometry was disposed).
  */
 export function buildTerrainMesh(
   tx: number, ty: number, tz: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
+  material: Material,
 ): Mesh | null {
   const verts = (GRID + 1) * (GRID + 1);
   const positions = new Float32Array(verts * 3);
@@ -87,8 +91,7 @@ export function buildTerrainMesh(
   g.setIndex(new BufferAttribute(indices, 1));
   g.computeBoundingSphere();
 
-  const mat = new MeshLambertMaterial({ vertexColors: true, flatShading: false });
-  const mesh = new Mesh(g, mat);
+  const mesh = new Mesh(g, material);
   mesh.name = `terrain z${tz} ${tx}/${ty}`;
   mesh.frustumCulled = true;
   return mesh;

@@ -57,16 +57,19 @@ export function decodeTerrariumRgb(r: number, g: number, b: number): number {
 export class TerrainSampler {
   private tiles = new Map<string, TerrainTile>();
   private clock = 0;
+  private disposed = false;
   readonly zoom = TERRAIN_ZOOM;
 
   /** Ensure the tiles covering a lat/lon are loaded. */
   async ensureLoaded(lat: number, lon: number): Promise<void> {
+    if (this.disposed) return;
     const { x, y } = geoToTile(lat, lon, this.zoom);
     await this.load(x, y);
   }
 
   /** Fire-and-forget: request a ring of tiles around a point. */
   requestRing(lat: number, lon: number, ringRadius = 2): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     const c = geoToTile(lat, lon, this.zoom);
     const promises: Promise<void>[] = [];
     for (let dy = -ringRadius; dy <= ringRadius; dy++) {
@@ -98,7 +101,7 @@ export class TerrainSampler {
     return n;
   }
 
-  dispose(): void { this.tiles.clear(); }
+  dispose(): void { this.disposed = true; this.tiles.clear(); }
 
   // ── Internal ─────────────────────────────────────────────────────────────
 
@@ -118,6 +121,7 @@ export class TerrainSampler {
   }
 
   private load(x: number, y: number): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     // Clamp Y to valid range (poles); wrap X (world seam).
     const zSize = 1 << this.zoom;
     if (y < 0 || y >= zSize) return Promise.resolve();
@@ -135,7 +139,12 @@ export class TerrainSampler {
     this.tiles.set(k, tile);
     this.evict();
     tile.loading = this.fetchWithRetry(x, y).then(
-      (buf) => decodeTerrariumPng(buf).then((elev) => { tile.elev = elev; }),
+      // Drop late arrivals so a dispose during init doesn't leave decoded
+      // Float32Arrays sitting in the tile map after the sampler is gone.
+      (buf) => decodeTerrariumPng(buf).then((elev) => {
+        if (this.disposed) return;
+        tile.elev = elev;
+      }),
       () => { tile.failed = true; },
     ).finally(() => { tile.loading = null; });
     return tile.loading;

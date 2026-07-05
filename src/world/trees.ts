@@ -188,5 +188,10 @@ export function buildTreeInstances(
   mesh.instanceMatrix.needsUpdate = true;
   mesh.frustumCulled = true;
   mesh.receiveShadow = false; mesh.castShadow = false;
+  // Both geometry and material are module-shared across every tile.
+  // The tile streamer reads these flags to skip .dispose() on eviction —
+  // without them, evicting one treed tile would blank trees for the whole session.
+  mesh.userData.sharedGeometry = true;
+  mesh.userData.sharedMaterial = true;
   return mesh;
 }

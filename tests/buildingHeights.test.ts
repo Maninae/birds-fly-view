@@ -37,8 +37,15 @@ describe('parseBuildingHeights', () => {
     expect(parseBuildingHeights({ hide_3d: '1', render_height: 10 })).toBeNull();
   });
 
-  it('does not let base equal or exceed height', () => {
-    const h = parseBuildingHeights({ render_height: 10, render_min_height: 20 });
-    expect(h!.base).toBeLessThan(h!.height);
+  it('returns null when render_min_height ≥ render_height (no volume to extrude)', () => {
+    // Fully-degenerate courtyard child: min = height. Nothing to draw.
+    expect(parseBuildingHeights({ render_height: 10, render_min_height: 10 })).toBeNull();
+    expect(parseBuildingHeights({ render_height: 10, render_min_height: 20 })).toBeNull();
+  });
+
+  it('keeps a healthy sliver of extrusion between min and height', () => {
+    const h = parseBuildingHeights({ render_height: 30, render_min_height: 25 });
+    expect(h!.height).toBe(30);
+    expect(h!.base).toBe(25);
   });
 });

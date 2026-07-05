@@ -44,13 +44,15 @@ export function buildTilePayload(
   const landcover = tile.layers.landcover;
   const landuse = tile.layers.landuse;
 
-  // Buildings — the visual centerpiece; keep as a named group so the
-  // raycaster can restrict itself to just these when landing.
+  // Buildings — the visual centerpiece. `userData.isBuilding` lets the
+  // WorldSource restrict `groundBelow`'s raycast to just these meshes,
+  // so trees/roads/water/greens never register as "perchable rooftops".
   if (building) {
     const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain);
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.buildingMat);
       mesh.name = 'buildings';
+      mesh.userData.isBuilding = true;
       g.add(mesh);
     }
   }

@@ -53,6 +53,7 @@ export class TileStreamer {
   private tz = VECTOR_ZOOM;
   private builder: TileBuilder;
   private templateP: Promise<string> | null = null;
+  private disposed = false;
 
   constructor(builder: TileBuilder) {
     this.root = new Group();
@@ -71,8 +72,10 @@ export class TileStreamer {
   /**
    * Called each frame: update wanted set based on camera, drain fetch/build
    * queues within a time budget, evict tiles far outside the ring.
+   * No-op after `dispose()` — protects against loop calls that outlive us.
    */
   update(cameraLat: number, cameraLon: number, buildBudgetMs = 4): void {
+    if (this.disposed) return;
     this.clock++;
     const cx = Math.floor(lonToTileX(cameraLon, this.tz));
     const cy = Math.floor(latToTileY(cameraLat, this.tz));
@@ -101,12 +104,12 @@ export class TileStreamer {
       if (performance.now() - t0 >= buildBudgetMs) break;
     }
 
-    // Kick off any queued fetches under the concurrency cap.
+    // Kick off any queued fetches under the concurrency cap. Everything on
+    // `queued` was just enqueued in `startTile` in state 'fetching' with no
+    // in-flight promise — no defensive re-check needed.
     while (this.inFlight < CONCURRENCY && this.queued.length) {
-      const k = this.queued.shift()!;
-      const entry = this.tiles.get(k);
-      if (!entry || entry.state !== 'fetching' || entry.tilePromise) continue;
-      this.startFetch(entry);
+      const entry = this.tiles.get(this.queued.shift()!);
+      if (entry) this.startFetch(entry);
     }
 
     // Evict tiles outside the (radius + margin) box.
@@ -136,6 +139,7 @@ export class TileStreamer {
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const [, entry] of this.tiles) this.disposeSubtree(entry.root);
     this.tiles.clear();
     this.root.clear();
@@ -174,7 +178,7 @@ export class TileStreamer {
 
   private enqueueBuild(entry: TileEntry, tile: VectorTile): void {
     this.buildQueue.push(async () => {
-      if (!this.frame) return;
+      if (this.disposed || !this.frame) return;
       try {
         const obj = this.builder(tile, entry.tx, entry.ty, this.tz, this.frame);
         if (obj) entry.root.add(obj);
@@ -203,9 +207,15 @@ export class TileStreamer {
   }
 
   private disposeSubtree(root: Object3D): void {
+    // Materials are all coordinator-owned (StylizedWorld) or module-shared
+    // (trees.ts); disposing them per-tile would blank surfaces mid-session.
+    // Geometries are per-tile UNLESS explicitly flagged shared (trees).
     root.traverse((n) => {
-      const mesh = n as { geometry?: { dispose?: () => void } };
-      mesh.geometry?.dispose?.();
+      const anyN = n as {
+        geometry?: { dispose?: () => void };
+        userData?: { sharedGeometry?: boolean };
+      };
+      if (!anyN.userData?.sharedGeometry) anyN.geometry?.dispose?.();
     });
   }
 }

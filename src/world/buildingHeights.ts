@@ -28,6 +28,11 @@ export function parseBuildingHeights(
   const minH = toFinite(props.render_min_height);
 
   const height = clamp(h ?? DEFAULT_HEIGHT_M, 1, MAX_HEIGHT_M);
+  // Skip degenerate features: min_height ≥ height leaves no volume to
+  // extrude (a courtyard child that OpenMapTiles has already tagged the
+  // parent's full height). Rendering a 0.5-m clamp-sliver at that base
+  // was visible as a floating stripe.
+  if (minH !== null && minH >= height) return null;
   const base = clamp(minH ?? 0, 0, height - 0.5);
   return { height, base };
 }
