@@ -2,7 +2,12 @@
 
 ## TL;DR
 
-<!-- FILLED AT SHIP: live URL, what works, screenshots -->
+**LIVE: https://maninae.github.io/birds-fly-view/** — click a preset chip or type
+any Bay Area address, and you're a bird over a golden-hour dream-twin of the real
+city. Everything works keyless: flight, rooftop perching (press E when the prompt
+shows), street-level walking, mid-flight travel (Esc), and an optional photoreal
+mode behind paste-your-own-Google-key. Verified end-to-end on the live site
+tonight — zero console errors. Hero shots in `docs/screenshots/`.
 
 ## The prior-art check you asked for
 
@@ -53,8 +58,40 @@ Free tier = 1,000 sessions/month; one session ≈ one page-load ≤ 3 hours of f
 
 ## What shipped
 
-<!-- FILLED AT SHIP: architecture summary, module list, verification evidence -->
+Built overnight by a 4-agent Opus fan-out (world / bird / shell / photo) against
+locked contracts in `src/types.ts`, then integrated, polished twice, reviewed by a
+fresh Opus agent, and review-fixed. 20 granular commits.
+
+- **Dream world** (`src/world`, `src/geo`): OpenFreeMap z14 vector tiles → merged
+  per-tile meshes (buildings with real heights + vertex fake-AO, roads by class,
+  teal Bay, park trees via InstancedMesh), AWS Terrarium z12 terrain, streamed in
+  a ring on a 4 ms/frame build budget. ~85 FPS on Apple Silicon.
+- **Bird** (`src/bird`, `src/input.ts`): procedural low-poly tern, energy-lite
+  soaring (no stall, no crash), coordinated bank-to-turn, assisted swoop landing,
+  perch/walk/takeoff state machine, spring-damped chase cam + first-person toggle.
+- **Shell** (`src/app`, `src/ui`): golden-hour shader sky + fog, Photon address
+  search (Bay-bboxed), translucent mid-flight search veil, whisper HUD, key modal,
+  attribution footer, generation-guarded world switching.
+- **Photo mode** (`src/world-photo`): Google Photorealistic 3D Tiles via
+  3d-tiles-renderer, lazy-chunked, key in localStorage only.
+- **Quality**: 25 unit tests green, tsc strict clean, fresh-agent review with all
+  HIGH findings fixed and re-verified (25,921-probe raycast audit: no perch
+  prompts over water/trees; shared geometry survives tile eviction; no leaks
+  across repeated takeoffs), production bundle smoked on the live URL, mobile
+  title + flight verified (desktop is the real experience, as labeled).
 
 ## Known gaps / next steps
 
-<!-- FILLED AT SHIP -->
+- **Photoreal mode is code-complete but needs your key to runtime-verify** —
+  smoke page: `/photo-demo.html?key=YOUR_KEY` (or the in-app modal). Everything
+  past Google's auth handshake is untested until then.
+- **Geocode results can show duplicate labels** (Photon returns several OSM
+  entities for one place) — dedupe by label+distance would be a 20-line fix.
+- **Bridges drape on the water** (Bay Bridge is a surface road for now);
+  building parts (`hide_3d`), landuse ground tints, and slope "retaining walls"
+  on steep hills are v2 world items.
+- **Walking cam can clip into a wall** when you land flush against one.
+- **Mobile flight controls** (touch steering) — v1 is desktop-first by design.
+- Deferred LOW review items: PhotoWorld dispose-during-load toast, palette hash
+  over-mixing, build-budget micro-yielding, HUD listener dispose path. All
+  cosmetic/perf-margin.
