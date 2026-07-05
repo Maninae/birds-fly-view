@@ -15,7 +15,8 @@ function boot(): void {
   const ui = createUi({
     container: document.body,
     hooks: {
-      onTakeoff: (point, label) => holder.app?.hooks().onTakeoff(point, label),
+      onTakeoff: (point, label, headingDeg) =>
+        holder.app?.hooks().onTakeoff(point, label, headingDeg),
       onWorldKind: (kind, apiKey) => holder.app?.hooks().onWorldKind(kind, apiKey),
     },
   });
