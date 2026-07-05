@@ -26,13 +26,23 @@ export interface TileMaterials {
   greenMat: MeshLambertMaterial;
 }
 
-/** Build all merged surface meshes for one tile. Returns null if empty. */
+/**
+ * Build all merged surface meshes for one tile.
+ *
+ * `emittedEdges` is coordinator-owned so wall-edge dedupe is world-global.
+ * A building whose east wall butts up against a building in the neighboring
+ * tile will only render that wall once — even though each tile's MVT data
+ * carries its own copy of the edge.
+ *
+ * Returns null if the tile has no drawable content.
+ */
 export function buildTilePayload(
   tile: VectorTile,
   tx: number, ty: number, tz: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
   mats: TileMaterials,
+  emittedEdges: Set<string>,
 ): Group | null {
   const g = new Group();
   g.name = `tile-content ${tx}/${ty}`;
@@ -48,7 +58,7 @@ export function buildTilePayload(
   // WorldSource restrict `groundBelow`'s raycast to just these meshes,
   // so trees/roads/water/greens never register as "perchable rooftops".
   if (building) {
-    const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain);
+    const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain, emittedEdges);
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.buildingMat);
       mesh.name = 'buildings';

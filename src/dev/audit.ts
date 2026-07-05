@@ -92,7 +92,6 @@ function auditTriangles(meshes: Mesh[]) {
 /** Downward rays over building bboxes — closed roofs must return hits. */
 function auditRoofRays(meshes: Mesh[]) {
   const ray = new Raycaster();
-  ray.firstHitOnly = false;
   let samples = 0, hits = 0;
   for (const m of meshes) {
     m.geometry.computeBoundingBox();

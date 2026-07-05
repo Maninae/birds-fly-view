@@ -9,7 +9,8 @@ import type { VectorTileLayer, VectorTileFeature } from '@mapbox/vector-tile';
 import { EnuFrame, projectTileRingToEnu2 } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import {
-  extractPolygons, appendPolygonFlat, ringCentroid,
+  extractPolygons, appendPolygonFlat, clipPolylineToTileBox,
+  featureAnchorInTile, ringCentroid,
 } from './geometryUtils';
 import {
   RibbonBuilder, ROAD_HALF_WIDTHS, DRAWABLE_CLASSES,
@@ -53,18 +54,28 @@ export function buildRoadBuffers(
     const cls = String(props.class ?? '');
     if (!DRAWABLE_CLASSES.has(cls)) continue;
     if (props.brunnel === 'tunnel') continue;
+    // NB: lines never use `featureAnchorInTile` — an L-shaped way's
+    // bbox center can land in the buffer even when a real interior
+    // segment lies in-tile. Clip instead so seams meet by construction.
 
     color.copy(ROAD_COLORS[cls] ?? ROAD_COLORS.minor);
     const halfW = ROAD_HALF_WIDTHS[cls];
+    const extent = feat.extent;
 
-    // Only lines / multilines. loadGeometry() returns Point[][].
+    // loadGeometry() returns Point[][] — one polyline per ring.
     const rings = feat.loadGeometry();
     for (const ring of rings) {
       if (ring.length < 2) continue;
-      const line: { x: number; z: number }[] = projectTileRingToEnu2(
-        ring, tileX, tileY, tileZ, feat.extent, frame,
-      ).map((v) => ({ x: v.x, z: v.y }));
-      rb.addPolyline(line, halfW, color, ROAD_DRAPE);
+      // Clip in tile-local coords FIRST, then project each sub-polyline.
+      // Each tile emits exactly the portion inside its own [0, extent)
+      // box; adjacent tiles pick up their side at the shared boundary.
+      const subLines = clipPolylineToTileBox(ring, extent);
+      for (const sub of subLines) {
+        const line: { x: number; z: number }[] = projectTileRingToEnu2(
+          sub, tileX, tileY, tileZ, extent, frame,
+        ).map((v) => ({ x: v.x, z: v.y }));
+        rb.addPolyline(line, halfW, color, ROAD_DRAPE);
+      }
     }
   }
 
@@ -94,6 +105,7 @@ export function buildWaterBuffers(
     const feat = layer.feature(i);
     // Vector-tile type: 3 = polygon.
     if (feat.type !== 3) continue;
+    if (!featureAnchorInTile(feat)) continue; // dedupe tile-buffer overlap
     const polys = extractPolygons(feat, tileX, tileY, tileZ, frame);
     for (const poly of polys) {
       appendPolygonFlat(poly, WATER_Y, c, positions, normals, colors, indices);
@@ -130,6 +142,7 @@ export function buildGreenBuffers(
   let hit = 0;
   const stamp = (feat: VectorTileFeature, color: Color) => {
     if (feat.type !== 3) return;
+    if (!featureAnchorInTile(feat)) return; // dedupe tile-buffer overlap
     const polys = extractPolygons(feat, tileX, tileY, tileZ, frame);
     for (const poly of polys) {
       // Sample Y at centroid — polygon is small enough to look flat.

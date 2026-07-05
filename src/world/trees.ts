@@ -15,7 +15,7 @@ import type { VectorTileLayer } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import {
-  extractPolygons, pointInRing, ringBounds,
+  extractPolygons, featureAnchorInTile, pointInRing, ringBounds,
 } from './geometryUtils';
 import { TREE_CANOPY_A, TREE_CANOPY_B, TREE_TRUNK, hash32 } from './palette';
 
@@ -138,6 +138,7 @@ export function buildTreeInstances(
       const f = l.feature(i);
       if (f.type !== 3) continue;
       if (classFilter && !classFilter((f.properties as { class?: string }).class)) continue;
+      if (!featureAnchorInTile(f)) continue; // dedupe tile-buffer overlap
       const polys = extractPolygons(f, tileX, tileY, tileZ, frame);
       for (const p of polys) rings.push(p.outer);
     }

@@ -65,6 +65,9 @@ export class StylizedWorld implements WorldSource {
   private terrainMat: MeshLambertMaterial;
   private oceanMat: MeshLambertMaterial;
 
+  /** World-global party-wall dedupe (see tileBuilder + buildingMesh). */
+  private emittedEdges = new Set<string>();
+
   constructor() {
     this.root = new Group();
     this.root.name = 'stylized-world';
@@ -102,14 +105,16 @@ export class StylizedWorld implements WorldSource {
     this.terrainRoot.name = 'terrain-tiles';
     this.root.add(this.terrainRoot);
 
-    // Streamer builds meshes with our materials.
+    // Streamer builds meshes with our materials. The shared `emittedEdges`
+    // set makes party-wall dedupe world-global — walls that abut across
+    // tile seams only render once.
     this.streamer = new TileStreamer((tile, tx, ty, tz, frame) =>
       buildTilePayload(tile, tx, ty, tz, frame, this.terrain, {
         buildingMat: this.buildingMat,
         roadMat: this.roadMat,
         waterMat: this.waterMat,
         greenMat: this.greenMat,
-      }),
+      }, this.emittedEdges),
     );
     this.root.add(this.streamer.root);
   }
@@ -118,6 +123,8 @@ export class StylizedWorld implements WorldSource {
     if (this.disposed) return;
     this.frame = new EnuFrame(origin);
     this.streamer.setFrame(this.frame);
+    // New anchor origin invalidates every cached wall-edge key.
+    this.emittedEdges.clear();
 
     // Fetch the vector-tile template + pre-load terrain around the takeoff
     // point BEFORE resolving so buildings can drape correctly on spawn.
@@ -212,6 +219,7 @@ export class StylizedWorld implements WorldSource {
     this.disposed = true;
     this.streamer.dispose();
     this.terrain.dispose();
+    this.emittedEdges.clear();
     for (const mesh of this.terrainTiles.values()) mesh.geometry.dispose();
     this.terrainTiles.clear();
     // Drop the ocean plane's geometry too — its material is in the field list.
