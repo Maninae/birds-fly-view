@@ -11,6 +11,11 @@ import type { GeoPoint, UiApi, WorldKind, WorldSource } from '../types';
 import type { AppFactories } from './App';
 
 export interface SwitcherHooks {
+  /**
+   * Called the moment a world is constructed, BEFORE `init()` runs.
+   * App uses this to wire renderer-dependent extras (PhotoWorld.setCamera).
+   */
+  onBuilt(world: WorldSource): void;
   /** Called after a successful takeoff or world-switch resolves. */
   onReady(world: WorldSource): void;
 }
@@ -62,6 +67,7 @@ export class WorldSwitcher {
         this.worldKind = 'dream';
         this.world = this.factories.world();
       }
+      this.hooks.onBuilt(this.world);
       this.scene.add(this.world.root);
       await this.world.init(origin);
 
@@ -109,6 +115,7 @@ export class WorldSwitcher {
         this.world = null;
       }
       this.world = await this.buildForKind(kind, apiKey);
+      this.hooks.onBuilt(this.world);
       this.scene.add(this.world.root);
       await this.world.init(this.lastOrigin);
       this.hooks.onReady(this.world);
@@ -123,6 +130,7 @@ export class WorldSwitcher {
       this.worldKind = 'dream';
       try {
         this.world = this.factories.world();
+        this.hooks.onBuilt(this.world);
         this.scene.add(this.world.root);
         await this.world.init(this.lastOrigin);
         this.hooks.onReady(this.world);

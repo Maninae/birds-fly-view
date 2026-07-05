@@ -35,6 +35,13 @@ const MAX_DT_S = 0.05;
 const GROUND_PROBE_HEIGHT = 4000;
 const GROUND_PROBE_RANGE = 5000;
 
+/** Worlds that need the render camera before init() — PhotoWorld's tile LOD. */
+function hasSetCamera(w: WorldSource): w is WorldSource & {
+  setCamera(camera: PerspectiveCamera, renderer: WebGLRenderer): void;
+} {
+  return typeof (w as { setCamera?: unknown }).setCamera === 'function';
+}
+
 /**
  * Factory bundle — the only surface an integrator needs to swap for tests
  * or the dev harness. In prod, `world` is `new StylizedWorld()`, `bird` is
@@ -53,12 +60,9 @@ export function defaultFactories(): AppFactories {
   return {
     world: () => new StylizedWorld(),
     photoWorld: async (apiKey: string) => {
-      // Path is opaque to tsc so the typecheck doesn't fail if PhotoWorld.ts
-      // isn't in the tree yet; the caller catches to show a toast.
-      const path = '../world-photo/PhotoWorld';
-      const mod = (await import(/* @vite-ignore */ path)) as {
-        PhotoWorld: new (apiKey: string) => WorldSource;
-      };
+      // Real dynamic import so Vite code-splits photo mode (3d-tiles-renderer
+      // is heavy) into a lazy chunk; the caller catches to show a toast.
+      const mod = await import('../world-photo/PhotoWorld');
       return new mod.PhotoWorld(apiKey);
     },
     bird: (aspect: number) => new BirdSystem(aspect),
@@ -126,6 +130,14 @@ export class App {
     this.titleCamera.lookAt(0, 30, 0);
 
     this.switcher = new WorldSwitcher(this.scene, this.ui, this.factories, {
+      onBuilt: (world) => {
+        // PhotoWorld needs the render camera before init() for tile LOD;
+        // StylizedWorld has no setCamera and skips this. Bird is always
+        // constructed before takeoff/switch reaches here (see takeoff()).
+        if (hasSetCamera(world) && this.bird) {
+          world.setCamera(this.bird.camera, this.renderer);
+        }
+      },
       onReady: () => {
         // no-op — App reads switcher.current in the loop.
       },
@@ -158,6 +170,14 @@ export class App {
     label: string,
     headingDeg?: number,
   ): Promise<void> {
+    // Bird must exist before the world builds: PhotoWorld's tile LOD wants
+    // the render camera at construction time (see the onBuilt hook).
+    if (!this.bird) {
+      const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
+      this.bird = this.factories.bird(aspect);
+      this.scene.add(this.bird.object);
+    }
+
     const result = await this.switcher.takeoff(
       point,
       new Vector3(0, GROUND_PROBE_HEIGHT, 0),
@@ -166,12 +186,6 @@ export class App {
     if (!result) {
       this.flying = false;
       return;
-    }
-
-    if (!this.bird) {
-      const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
-      this.bird = this.factories.bird(aspect);
-      this.scene.add(this.bird.object);
     }
 
     const spawn = new Vector3(0, result.groundY + START_ALTITUDE_M, 0);
