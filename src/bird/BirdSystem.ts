@@ -26,6 +26,8 @@ import type {
   WorldSource,
 } from '../types.js';
 import { CameraRig } from './camera.js';
+import type { CollisionMemory } from './collision.js';
+import { enforceGroundFloor, newCollisionMemory } from './collision.js';
 import { newFlightMemory, stepFlight } from './flight.js';
 import type { FlightMemory, FlightStepResult } from './flight.js';
 import { BirdMesh } from './mesh.js';
@@ -51,6 +53,8 @@ export class BirdSystem implements BirdSystemApi {
   private readonly rig: CameraRig;
   private readonly flight: FlightMemory;
   private readonly walk: WalkMemory;
+  /** Shared "never clip / never underground" state; passed to every step. */
+  private readonly col: CollisionMemory;
 
   /** Non-zero while easing between modes; when > 0 we interpolate. */
   private easeT = 0;
@@ -67,6 +71,7 @@ export class BirdSystem implements BirdSystemApi {
 
     this.flight = newFlightMemory();
     this.walk = newWalkMemory();
+    this.col = newCollisionMemory();
 
     this.pose = {
       position: new Vector3(0, 100, 0),
@@ -131,10 +136,14 @@ export class BirdSystem implements BirdSystemApi {
           this.tickWalking(dt, input, world);
           break;
         case 'perched':
-          this.tickPerched(dt, input);
+          this.tickPerched(dt, input, world);
           break;
       }
     }
+
+    // Belt-and-braces floor: absolute underground guarantee for every mode,
+    // including perched and mid-ease frames — nothing bypasses the clamp.
+    enforceGroundFloor(this.pose, this.col, world, 0.02);
 
     // Update visual mesh + camera every frame regardless of mode.
     this.mesh.update(this.pose, this._mode, dt);
@@ -144,7 +153,7 @@ export class BirdSystem implements BirdSystemApi {
   // --- per-mode ticks ------------------------------------------------------
 
   private tickFlying(dt: number, input: InputState, world: WorldSource): void {
-    const res: FlightStepResult = stepFlight(this.pose, this.flight, input, world, dt);
+    const res: FlightStepResult = stepFlight(this.pose, this.flight, this.col, input, world, dt);
     this._landing = res.landing;
 
     if (input.interact && this._landing) {
@@ -155,17 +164,17 @@ export class BirdSystem implements BirdSystemApi {
   private tickWalking(dt: number, input: InputState, world: WorldSource): void {
     // Walk is keyboard-only, relative to the bird's own facing (A/D turn,
     // W/S walk). The camera already tracks pose.yaw in `camera.ts`.
-    const res = stepWalk(this.pose, this.walk, input, world, dt);
-    if (res.takeoff) this.beginTakeoff();
+    const res = stepWalk(this.pose, this.walk, this.col, input, world, dt);
+    if (res.takeoff) this.beginTakeoff(world);
 
     // In walking mode the landing prompt is silenced.
     this._landing = null;
   }
 
-  private tickPerched(_dt: number, input: InputState): void {
+  private tickPerched(_dt: number, input: InputState, world: WorldSource): void {
     // Perched idle: pose unchanged. flapPhase drifts inside BirdMesh idle.
     if (input.interact || input.flap) {
-      this.beginTakeoff();
+      this.beginTakeoff(world);
     }
     this._landing = null;
   }
@@ -221,10 +230,13 @@ export class BirdSystem implements BirdSystemApi {
     }
   }
 
-  private beginTakeoff(): void {
+  private beginTakeoff(world: WorldSource): void {
     // Reset flight memory and pop up ABOVE the landing-detection window so
     // the very-next flight tick doesn't spuriously re-detect a candidate.
     this.pose.position.y += LAND_HEIGHT * 1.2;
+    // If the takeoff pop somehow puts the bird into a hillside (steep terrain
+    // + generous pop), the shared floor guarantee fires and lifts us clear.
+    enforceGroundFloor(this.pose, this.col, world, 0.05);
     this.pose.speed = CRUISE_SPEED * 0.7;
     this.pose.pitch = 0.1;   // slight climb
     this.pose.roll = 0;

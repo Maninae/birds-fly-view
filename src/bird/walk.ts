@@ -12,6 +12,8 @@
  */
 import { Vector3 } from 'three';
 import type { BirdPose, InputState, WorldSource } from '../types.js';
+import type { CollisionMemory, WallSlideResult } from './collision.js';
+import { enforceGroundFloor, wallLookahead, wallSlide } from './collision.js';
 import { approach, headingVector } from './flight.js';
 import {
   WALK_ACCEL,
@@ -44,6 +46,7 @@ export function newWalkMemory(): WalkMemory {
 }
 
 const _fwd = new Vector3();
+const _slide: WallSlideResult = { hit: false, velX: 0, velZ: 0 };
 
 /**
  * Advance the walking pose one step. Turn (A/D) rotates yaw in place; forward
@@ -52,6 +55,7 @@ const _fwd = new Vector3();
 export function stepWalk(
   pose: BirdPose,
   mem: WalkMemory,
+  col: CollisionMemory,
   input: InputState,
   world: WorldSource,
   dt: number,
@@ -69,6 +73,11 @@ export function stepWalk(
   // Smooth accel onto the target planar velocity.
   mem.velX = approach(mem.velX, desiredX, WALK_ACCEL * dt);
   mem.velZ = approach(mem.velZ, desiredZ, WALK_ACCEL * dt);
+
+  // Wall slide even while walking — bird can't stuff itself into a facade.
+  wallSlide(pose, mem.velX, mem.velZ, wallLookahead(WALK_SPEED, dt), world, _slide);
+  mem.velX = _slide.velX;
+  mem.velZ = _slide.velZ;
   const moving = Math.hypot(mem.velX, mem.velZ);
 
   pose.pitch = approach(pose.pitch, 0, WALK_TURN_RATE * dt);
@@ -97,17 +106,15 @@ export function stepWalk(
   pose.position.z += mem.velZ * dt;
   pose.position.y += mem.velY * dt;
 
-  // Stick to ground.
-  const belowHit = world.groundBelow(pose.position);
-  if (belowHit) {
-    const groundY = belowHit.point.y;
-    if (pose.position.y <= groundY + 0.02) {
-      pose.position.y = groundY;
-      if (mem.velY < 0) mem.velY = 0;
-      mem.grounded = true;
-    } else {
-      mem.grounded = false;
-    }
+  // Stick to ground with the same floor guarantee flight uses (fallback to
+  // last known ground when tiles are momentarily absent). `grounded` reads
+  // "was I within 0.03 m of the floor after the clamp?".
+  const { floorY, clamped } = enforceGroundFloor(pose, col, world, 0);
+  if (clamped) {
+    if (mem.velY < 0) mem.velY = 0;
+    mem.grounded = true;
+  } else if (floorY !== null) {
+    mem.grounded = pose.position.y - floorY <= 0.03;
   }
 
   // Waddle bob while moving — layer a small Y offset on the pose so the

@@ -11,9 +11,28 @@ bird/
   flight.ts         stepFlight() — flying-mode physics + landing detection
   walk.ts           stepWalk()   — walking-mode physics + takeoff trigger
   camera.ts         CameraRig    — chase/first-person, spring damping, FOV ease
+  collision.ts      floor clamp · 3-probe wall slide · bird→camera unclip
   tuning.ts         ALL feel constants (speeds, rates, damping, colors)
   index.ts          public re-export of BirdSystem
 ```
+
+## Collision guarantees
+
+- **Underground.** `enforceGroundFloor(pose, col, world)` clamps `pose.y` to
+  at least `groundBelow(pose).point.y + epsilon` every frame in every mode
+  (including the landing ease and takeoff pop). If `world.groundBelow` is null
+  (tile unloaded), the last known safe ground is used as the floor.
+- **Walls.** `wallSlide(pose, velX, velZ, lookahead, world)` casts three probes
+  (nose + each wingtip at `WINGTIP_OFFSET` lateral) from `WALL_PROBE_LIFT`
+  above the bird — a high-y raycast so the topmost surface at the probe's
+  (x,z) is what's returned, not an interior floor. On any hit, the horizontal
+  velocity is projected onto the plane perpendicular to the combined outward
+  normal. Bird skims the wall; no stop, no bounce.
+- **Camera.** `unclipCamera(camPos, birdPos, world)` samples the bird→camera
+  ray at `CAM_CLIP_SAMPLES` points; if any sample sits below the topmost
+  surface at its (x,z), the camera is pulled to `CAM_CLIP_MARGIN` metres in
+  front of that entry. Runs after damp, so smoothing sees an already-safe
+  target and never eases through geometry.
 
 ## Contracts
 

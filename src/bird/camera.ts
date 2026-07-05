@@ -16,6 +16,7 @@
  */
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { AppMode, BirdPose, InputState, WorldSource } from '../types.js';
+import { unclipCamera } from './collision.js';
 import { headingVector } from './flight.js';
 import {
   CAM_GROUND_MARGIN,
@@ -125,6 +126,15 @@ export class CameraRig {
     const fovTarget = this.view === 'first' ? FOV_MIN + 4 : FOV_MIN + (FOV_MAX - FOV_MIN) * t;
     const fovAlpha = 1 - Math.pow(2, -dt / FOV_HALFLIFE);
     this.smoothFov = this.smoothFov + (fovTarget - this.smoothFov) * fovAlpha;
+
+    // Final unclip: sample bird→camera ray; if any point is inside geometry,
+    // pull camera in front of the wall. Bird itself is guaranteed outside
+    // geometry (enforceGroundFloor + wallSlide), so the bird end of the ray
+    // is always a safe anchor. Only meaningful for chase / walk over-shoulder
+    // — first-person cam sits at the bird's head and skips the sweep.
+    if (this.view !== 'first') {
+      unclipCamera(this.smoothPos, pose.position, world);
+    }
 
     this.camera.position.copy(this.smoothPos);
     this.camera.lookAt(this.smoothLook);

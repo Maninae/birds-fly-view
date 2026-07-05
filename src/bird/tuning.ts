@@ -65,6 +65,25 @@ export const FLARE_PITCH = Math.PI * 20 / 180;  // 20° up assist
 export const MAX_STEP_M = 4.0;   // if step > this, substep the update
 export const FORWARD_PROBE = 2.0; // meters ahead for wall check
 
+// -- Collision (wall probes + camera unclip) --------------------------------
+
+/** Half-wingspan for the two side probes flanking the nose (m). */
+export const WINGTIP_OFFSET = 1.2;
+/** Minimum forward-lookahead the wall probes ever use (m). */
+export const WALL_SAFETY_MARGIN = 2.0;
+/**
+ * Raise the wall probe this far above the bird so the raycast enters the
+ * scene from above every rooftop/hill — otherwise a probe at bird height
+ * inside a building volume would return the interior floor, not the wall
+ * itself. Buildings in SF top out ≈ 270 m; 300 m clears everything.
+ */
+export const WALL_PROBE_LIFT = 300.0;
+
+/** Camera-unclip parameters (bird→camera ray sampling). */
+export const CAM_CLIP_SAMPLES = 8;
+export const CAM_CLIP_MARGIN = 0.35;    // pull camera this far off the wall
+export const MIN_CAM_DIST = 0.7;        // never collapse camera onto bird
+
 /** Landing eligibility while flying. Generous by design — the whole point
  *  is that landing on a rooftop should feel magical, not fiddly.
  *  Same thresholds drive both the UI prompt and the E-assist swoop. */

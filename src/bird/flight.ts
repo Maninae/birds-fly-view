@@ -17,6 +17,8 @@
  */
 import { Vector3 } from 'three';
 import type { BirdPose, GroundHit, InputState, WorldSource } from '../types.js';
+import type { CollisionMemory, WallSlideResult } from './collision.js';
+import { enforceGroundFloor, wallLookahead, wallSlide } from './collision.js';
 import {
   AUTOLEVEL_PITCH,
   AUTOLEVEL_ROLL,
@@ -34,7 +36,6 @@ import {
   FLAP_TAP_LIFT,
   FLARE_ALTITUDE,
   FLARE_PITCH,
-  FORWARD_PROBE,
   GRAVITY,
   LAND_HEIGHT,
   LAND_MAX_SPEED,
@@ -69,28 +70,28 @@ export function newFlightMemory(): FlightMemory {
 }
 
 const _fwd = new Vector3();
-const _probe = new Vector3();
-const _below = new Vector3();
+const _slide: WallSlideResult = { hit: false, velX: 0, velZ: 0 };
 
 /**
  * Advance the pose one step. Mutates `pose` in place. Substeps if the naive
- * displacement would exceed MAX_STEP_M to avoid tunneling.
+ * displacement would exceed MAX_STEP_M — even at 45 m/s max dive, that keeps
+ * per-substep travel small enough that the wall probes catch every facade.
  */
 export function stepFlight(
   pose: BirdPose,
   mem: FlightMemory,
+  col: CollisionMemory,
   input: InputState,
   world: WorldSource,
   dt: number,
 ): FlightStepResult {
-  // Substep for high-speed dives so we don't skip across a wall.
   const displacement = pose.speed * dt;
   const substeps = Math.max(1, Math.ceil(displacement / MAX_STEP_M));
   const stepDt = dt / substeps;
 
   let result: FlightStepResult = { landing: null, slidingOnWall: false };
   for (let i = 0; i < substeps; i++) {
-    result = advance(pose, mem, input, world, stepDt);
+    result = advance(pose, mem, col, input, world, stepDt);
   }
   return result;
 }
@@ -98,6 +99,7 @@ export function stepFlight(
 function advance(
   pose: BirdPose,
   mem: FlightMemory,
+  col: CollisionMemory,
   input: InputState,
   world: WorldSource,
   dt: number,
@@ -183,8 +185,17 @@ function advance(
   // --- move ----------------------------------------------------------------
   headingVector(pose.yaw, _fwd);
   const horizSpeed = pose.speed * Math.cos(pose.pitch);
-  let dx = _fwd.x * horizSpeed * dt;
-  let dz = _fwd.z * horizSpeed * dt;
+  let velX = _fwd.x * horizSpeed;
+  let velZ = _fwd.z * horizSpeed;
+
+  // Wall slide: 3 probes (nose + wingtips) at speed-scaled lookahead. On hit,
+  // project the horizontal velocity onto the plane perpendicular to the
+  // combined outward normal — bird skims the facade, never enters.
+  const lookahead = wallLookahead(pose.speed, dt);
+  wallSlide(pose, velX, velZ, lookahead, world, _slide);
+  velX = _slide.velX;
+  velZ = _slide.velZ;
+  const slidingOnWall = _slide.hit;
 
   // Vertical velocity: energy-driven component + flap memory + level sink.
   let dy = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
@@ -194,31 +205,14 @@ function advance(
   // Decay flap-lift memory back to zero.
   mem.vy *= Math.pow(0.15, dt); // half-life ≈ 0.37 * dt inverse... quick decay
 
-  // Wall check: probe forward at head-height; if it hits something at head
-  // height (i.e. much higher than the ground below), stop forward motion.
-  let slidingOnWall = false;
-  _probe.copy(pose.position);
-  _probe.x += _fwd.x * FORWARD_PROBE;
-  _probe.z += _fwd.z * FORWARD_PROBE;
-  const forwardHit = world.groundBelow(_probe, 50);
-  if (forwardHit && forwardHit.point.y > pose.position.y - 0.5) {
-    // Wall detected — cancel horizontal step, keep vertical so we can climb out.
-    dx = 0;
-    dz = 0;
-    slidingOnWall = true;
-  }
-
-  pose.position.x += dx;
+  pose.position.x += velX * dt;
   pose.position.y += dy;
-  pose.position.z += dz;
+  pose.position.z += velZ * dt;
 
-  // Never sink below current ground (we mush along).
-  _below.copy(pose.position);
-  const groundNow = world.groundBelow(_below);
-  if (groundNow && pose.position.y < groundNow.point.y + 0.05) {
-    pose.position.y = groundNow.point.y + 0.05;
-    if (mem.vy < 0) mem.vy = 0;
-  }
+  // Absolute floor: pose.y is never allowed below ground + epsilon, even if
+  // tiles are momentarily unloaded (falls back to last known ground).
+  const { clamped } = enforceGroundFloor(pose, col, world, 0.05);
+  if (clamped && mem.vy < 0) mem.vy = 0;
 
   // --- flap phase animation ----------------------------------------------
   // Smoothly progress flapPhase 0..1. Beats accelerate the phase when active.
