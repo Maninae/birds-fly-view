@@ -70,12 +70,15 @@ Local ENU meters anchored at the takeoff origin (`geo/mercator.ts` owns all math
 (`mPerDegLon = 111319.49 × cos(lat0)`) — sub-meter accurate across the Bay.
 Re-anchoring happens on every new takeoff address (world rebuilds).
 
-## Art direction (locked)
+## Art direction (locked direction; exact values tuned in code)
 
 Golden hour, forever. Flat-shaded, no textures, fog does the atmosphere.
+`src/app/sky.ts` and `src/world/palette.ts` hold the canonical tuned values —
+the sky zenith was warmed from the original `#8FB8DE` to `#A6B4CB` during
+integration (steel-blue read as noon; dusty warm-blue reads as golden hour).
 
-- Sky: zenith `#8FB8DE` → horizon `#F5E3C8`, peach sun glow `#F2B98F`. Fog `#EDDCC4`
-  (FogExp2, density tuned so ~5 km visibility).
+- Sky: zenith dusty warm-blue → horizon `#F5E3C8`, peach sun glow `#F2B98F`.
+  Fog `#EDDCC4` (FogExp2, density tuned so ~5 km visibility).
 - Light: warm directional `#FFF3E0` low-angle; hemisphere `#BFD4E6` sky / `#D9C9A8` ground.
 - Buildings: warm cream/terracotta/dusty-rose/pale-sage family, per-building hue jitter
   (hash of feature id), slightly darker walls than roofs, cheap fake AO (vertex-darken
