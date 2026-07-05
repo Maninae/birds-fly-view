@@ -36,14 +36,16 @@ import {
 
 /** Shared flat-shaded material factory. */
 function mat(color: number, opts: { roughness?: number; metalness?: number; doubleSide?: boolean } = {}) {
+  // Wings + tail are single-quad panels — draw both faces so viewing from
+  // above or below never renders them as invisible backfaces. Spread the
+  // `side` key conditionally so passing it as `undefined` doesn't trip
+  // three.js's "parameter has value of undefined" warning.
   return new MeshStandardMaterial({
     color,
     flatShading: true,
     roughness: opts.roughness ?? 0.85,
     metalness: opts.metalness ?? 0.0,
-    // Wings + tail are single-quad panels — draw both faces so viewing from
-    // above or below never renders them as invisible backfaces.
-    side: opts.doubleSide ? DoubleSide : undefined,
+    ...(opts.doubleSide ? { side: DoubleSide } : {}),
   });
 }
 
