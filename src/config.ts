@@ -7,13 +7,16 @@
 /** Geocoder hard filter: SF Bay Area (San Jose → SF → Oakland → Marin). */
 export const BAY_BBOX = { west: -123.1, south: 37.2, east: -121.6, north: 38.2 };
 
-/** Takeoff presets (public landmarks only). */
-export const PRESETS: { label: string; lat: number; lon: number }[] = [
-  { label: 'Ferry Building, San Francisco', lat: 37.7955, lon: -122.3937 },
-  { label: 'Golden Gate Park', lat: 37.7694, lon: -122.4862 },
-  { label: 'Lake Merritt, Oakland', lat: 37.8044, lon: -122.2712 },
-  { label: 'Downtown San Jose', lat: 37.3337, lon: -121.8907 },
-  { label: 'Sather Tower, Berkeley', lat: 37.8721, lon: -122.2578 },
+/**
+ * Takeoff presets (public landmarks only).
+ * headingDeg: initial flight heading (0 = north), aimed at the best first view.
+ */
+export const PRESETS: { label: string; lat: number; lon: number; headingDeg?: number }[] = [
+  { label: 'Ferry Building, San Francisco', lat: 37.7955, lon: -122.3937, headingDeg: 245 },
+  { label: 'Golden Gate Park', lat: 37.7694, lon: -122.4862, headingDeg: 90 },
+  { label: 'Lake Merritt, Oakland', lat: 37.8044, lon: -122.2712, headingDeg: 210 },
+  { label: 'Downtown San Jose', lat: 37.3337, lon: -121.8907, headingDeg: 330 },
+  { label: 'Sather Tower, Berkeley', lat: 37.8721, lon: -122.2578, headingDeg: 265 },
 ];
 
 /** Spawn altitude above ground at takeoff (m). ~260 ft — a bird's view. */
