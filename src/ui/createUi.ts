@@ -15,6 +15,7 @@ import { createControlsHint } from './controlsHint';
 import { createLoading } from './loading';
 import { createToast } from './toast';
 import { createKeyModal } from './keyModal';
+import { createSearchButton } from './searchButton';
 
 export interface CreateUiOptions {
   container: HTMLElement;
@@ -40,6 +41,11 @@ export function createUi(opts: CreateUiOptions): UiApi {
   const loading = createLoading();
   const toast = createToast();
 
+  // Track whether we're currently in a flight state; the title veil behaves
+  // differently mid-flight (translucent so the world drifts behind).
+  let flying = false;
+  let titleOpen = true;
+
   const keyModal = createKeyModal({
     onSaved(apiKey) {
       opts.hooks.onWorldKind('photo', apiKey);
@@ -50,13 +56,44 @@ export function createUi(opts: CreateUiOptions): UiApi {
   });
 
   const title = createTitle({
-    onSelect(point: GeoPoint, label: string) {
-      opts.hooks.onTakeoff(point, label);
+    onSelect(point: GeoPoint, label: string, headingDeg?: number) {
+      opts.hooks.onTakeoff(point, label, headingDeg);
     },
     onOpenKeyModal() {
       keyModal.open();
     },
   });
+
+  const openTitle = (midflight: boolean): void => {
+    titleOpen = true;
+    title.show(midflight);
+    if (midflight && document.exitPointerLock) {
+      try {
+        document.exitPointerLock();
+      } catch {
+        // ignore — some browsers throw if not locked.
+      }
+    }
+    searchButton.setVisible(false);
+  };
+  const closeTitle = (): void => {
+    titleOpen = false;
+    title.hide();
+    if (flying) searchButton.setVisible(true);
+  };
+
+  const searchButton = createSearchButton(() => openTitle(true));
+
+  // Escape mid-flight toggles the title veil. During the title state Escape
+  // is a no-op — nothing to return to.
+  const onKeyDown = (ev: KeyboardEvent): void => {
+    if (ev.key !== 'Escape') return;
+    if (!flying) return;
+    ev.preventDefault();
+    if (titleOpen) closeTitle();
+    else openTitle(true);
+  };
+  window.addEventListener('keydown', onKeyDown);
 
   // Order matters: later children paint on top. Title veil sits above
   // in-flight HUD; loading, toast, and the key modal must sit above the
@@ -68,6 +105,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
     hud.chip,
     landing.root,
     controlsHint.root,
+    searchButton.root,
     title.root,
     loading.root,
     toast.root,
@@ -77,10 +115,13 @@ export function createUi(opts: CreateUiOptions): UiApi {
 
   return {
     showTitle() {
-      title.show();
+      // Called at initial boot — cold start, not mid-flight.
+      flying = false;
+      openTitle(false);
     },
     hideTitle() {
-      title.hide();
+      flying = true;
+      closeTitle();
       // First-flight hint fades in once the sky is visible.
       controlsHint.showOnce();
       hud.wake();
@@ -88,6 +129,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
     updateHud(state: HudState) {
       hud.update(state);
       attribution.set(state.attributions);
+      if (flying) searchButton.wake();
     },
     showLandingPrompt(kind) {
       landing.set(kind);

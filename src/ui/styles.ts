@@ -71,6 +71,14 @@ const CSS = /* css */ `
     opacity: 0;
     pointer-events: none;
   }
+  /* Mid-flight overlay: translucent so the world drifts behind, and no grain
+     film so the sky and buildings stay legible. */
+  .bfv-title.bfv-title-midflight {
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(255, 246, 227, 0.35), rgba(245, 227, 200, 0.55) 60%, rgba(215, 190, 155, 0.65));
+  }
+  .bfv-title.bfv-title-midflight::before { opacity: 0.15; }
+  .bfv-title.bfv-title-midflight::after { display: none; }
   .bfv-title::before {
     /* subtle paper grain */
     content: '';
@@ -304,6 +312,33 @@ const CSS = /* css */ `
 
   .bfv-hud-fade { opacity: 0; }
 
+  /* ------------- search button (mid-flight) ------------- */
+  .bfv-search-btn {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-family: var(--bfv-font-sans);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--bfv-ink-soft);
+    background: var(--bfv-panel);
+    border: 1px solid var(--bfv-border);
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease, opacity 350ms ease;
+  }
+  .bfv-search-btn:hover {
+    color: var(--bfv-ink);
+    background: var(--bfv-panel-strong);
+    border-color: rgba(201, 123, 90, 0.5);
+  }
+  .bfv-search-btn span { font-size: 14px; opacity: 0.8; }
+
   /* ------------- landing prompt ------------- */
   .bfv-landing {
     position: absolute;
@@ -337,14 +372,18 @@ const CSS = /* css */ `
   /* ------------- attribution ------------- */
   .bfv-attribution {
     position: absolute;
-    right: 12px;
+    right: 14px;
     bottom: 10px;
+    padding: 4px 6px;
     font-family: var(--bfv-font-sans);
     font-size: 10px;
     color: var(--bfv-ink-muted);
     line-height: 1.5;
     text-align: right;
-    max-width: 42vw;
+    max-width: min(48vw, 340px);
+    box-sizing: border-box;
+    word-break: normal;
+    overflow-wrap: anywhere;
     pointer-events: none;
   }
 

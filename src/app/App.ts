@@ -144,8 +144,8 @@ export class App {
   /** UiHooks glue — pass this to createUi. */
   hooks(): UiHooks {
     return {
-      onTakeoff: (point, label) => {
-        void this.takeoff(point, label);
+      onTakeoff: (point, label, headingDeg) => {
+        void this.takeoff(point, label, headingDeg);
       },
       onWorldKind: (kind, apiKey) => {
         void this.switcher.switchKind(kind, apiKey);
@@ -153,7 +153,11 @@ export class App {
     };
   }
 
-  private async takeoff(point: GeoPoint, label: string): Promise<void> {
+  private async takeoff(
+    point: GeoPoint,
+    label: string,
+    headingDeg?: number,
+  ): Promise<void> {
     const result = await this.switcher.takeoff(
       point,
       new Vector3(0, GROUND_PROBE_HEIGHT, 0),
@@ -171,7 +175,8 @@ export class App {
     }
 
     const spawn = new Vector3(0, result.groundY + START_ALTITUDE_M, 0);
-    this.bird.placeAt(spawn, 0);
+    const headingRad = ((headingDeg ?? 0) * Math.PI) / 180;
+    this.bird.placeAt(spawn, headingRad);
 
     if (!this.input) this.input = this.factories.input(this.canvas);
 

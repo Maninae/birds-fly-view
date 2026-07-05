@@ -22,12 +22,16 @@ import {
 
 const SKY_RADIUS = 8000;
 
-const COLOR_ZENITH = '#8FB8DE';
+// Golden-hour palette. Zenith is dusted-blue-with-a-touch-of-warmth so the
+// dome reads dreamy (not noon-blue) even at flight altitude; the glow band
+// reaches farther up the dome so the horizon peach isn't just a horizon
+// stripe from a bird's-eye view.
+const COLOR_ZENITH = '#A6B4CB';
 const COLOR_HORIZON = '#F5E3C8';
 const COLOR_GLOW = '#F2B98F';
 const COLOR_FOG = '#EDDCC4';
 const COLOR_SUN_LIGHT = '#FFF3E0';
-const COLOR_HEMI_SKY = '#BFD4E6';
+const COLOR_HEMI_SKY = '#C7D2E0';
 const COLOR_HEMI_GROUND = '#D9C9A8';
 
 export interface SkyHandles {
@@ -102,11 +106,12 @@ function makeSkyMaterial(): ShaderMaterial {
       void main() {
         // t = 0 at horizon, 1 at zenith.
         float t = clamp(vWorldDir.y * 0.5 + 0.5, 0.0, 1.0);
-        // main gradient
-        vec3 col = mix(uHorizon, uZenith, smoothstep(0.05, 0.9, t));
-        // low peach glow band just above the horizon
-        float glow = smoothstep(0.0, 0.18, t) * (1.0 - smoothstep(0.18, 0.55, t));
-        col = mix(col, uGlow, glow * 0.55);
+        // main gradient — hold onto the warm horizon longer before climbing.
+        vec3 col = mix(uHorizon, uZenith, smoothstep(0.15, 0.95, t));
+        // peach glow band — starts at the horizon, reaches ~65% up the dome
+        // so a bird at altitude still catches golden warmth overhead.
+        float glow = smoothstep(0.0, 0.22, t) * (1.0 - smoothstep(0.22, 0.7, t));
+        col = mix(col, uGlow, glow * 0.6);
         gl_FragColor = vec4(col, 1.0);
       }
     `,

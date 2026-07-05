@@ -51,7 +51,17 @@ export class WorldSwitcher {
         this.scene.remove(this.world.root);
         this.world.dispose();
       }
-      this.world = this.buildInitial();
+      // Honor the requested WorldKind — if photo mode was armed before
+      // takeoff but the key is missing or the load fails, fall through to
+      // dream so the user still gets a world.
+      try {
+        this.world = await this.buildForKind(this.worldKind);
+      } catch (photoErr) {
+        console.warn('photoreal build failed at takeoff — falling back to dream', photoErr);
+        this.ui.setError('photoreal tiles didn’t load — flying dream instead.');
+        this.worldKind = 'dream';
+        this.world = this.factories.world();
+      }
       this.scene.add(this.world.root);
       await this.world.init(origin);
 
@@ -133,12 +143,6 @@ export class WorldSwitcher {
   }
 
   // -- private ------------------------------------------------------------
-
-  private buildInitial(): WorldSource {
-    // Photo mode requires an async factory — always fall through to dream
-    // for the initial sync build; the caller can `switchKind('photo')` after.
-    return this.factories.world();
-  }
 
   private async buildForKind(kind: WorldKind, apiKey?: string): Promise<WorldSource> {
     if (kind === 'photo' && this.factories.photoWorld) {

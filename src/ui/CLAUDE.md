@@ -19,6 +19,15 @@ serif stack (Iowan Old Style/Palatino/Georgia); body uses the system sans.
 - `loading.ts` — full-screen soft veil with italic microcopy.
 - `toast.ts` — top-center error strip, auto-dismisses.
 - `keyModal.ts` — Google Maps key modal for photoreal mode.
+- `searchButton.ts` — mid-flight "⌕ somewhere else" whisper button;
+  click opens the title veil in mid-flight (translucent) mode.
+
+## Mid-flight title state
+
+Escape mid-flight (or the search button) reopens the title over the running
+world: `title.show(true)` adds `bfv-title-midflight` — a translucent variant
+so the sim keeps drifting behind. Preset chips and the search form stay
+clickable. `createUi` also releases pointer lock via `document.exitPointerLock()`.
 
 ## How to extend
 

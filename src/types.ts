@@ -96,7 +96,11 @@ export interface HudState {
 
 /** UI layer. Canonical implementation: ui/createUi.ts → `createUi(hooks)`. */
 export interface UiHooks {
-  onTakeoff(point: GeoPoint, label: string): void;
+  /**
+   * `headingDeg` (0 = N, +CW) is the initial flight heading; typed addresses
+   * default to 0, preset chips supply their own for the best first view.
+   */
+  onTakeoff(point: GeoPoint, label: string, headingDeg?: number): void;
   onWorldKind(kind: WorldKind, apiKey?: string): void;
 }
 

@@ -68,7 +68,11 @@ function boot(): void {
   // Hook holder — the UI needs a ref before we can build the App-like below.
   let ui!: UiApi;
 
-  const doTakeoff = async (point: GeoPoint, label: string): Promise<void> => {
+  const doTakeoff = async (
+    point: GeoPoint,
+    label: string,
+    headingDeg?: number,
+  ): Promise<void> => {
     ui.setError(null);
     ui.setLoading('finding your sky…');
     try {
@@ -88,7 +92,8 @@ function boot(): void {
 
       const hit = state.world.groundBelow(new Vector3(0, 4000, 0), 5000);
       const groundY = hit ? hit.point.y : 0;
-      state.bird.placeAt(new Vector3(0, groundY + START_ALTITUDE_M, 0), 0);
+      const headingRad = ((headingDeg ?? 0) * Math.PI) / 180;
+      state.bird.placeAt(new Vector3(0, groundY + START_ALTITUDE_M, 0), headingRad);
 
       state.lastOrigin = point;
       state.lastLabel = label;
@@ -117,8 +122,8 @@ function boot(): void {
   ui = createUi({
     container: document.body,
     hooks: {
-      onTakeoff: (p, label) => {
-        void doTakeoff(p, label);
+      onTakeoff: (p, label, headingDeg) => {
+        void doTakeoff(p, label, headingDeg);
       },
       onWorldKind,
     },

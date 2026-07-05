@@ -9,13 +9,14 @@ import type { GeoPoint } from '../types';
 import { searchAddress, type GeocodeResult } from '../geo/geocode';
 
 export interface TitleHandlers {
-  onSelect(point: GeoPoint, label: string): void;
+  /** `headingDeg` (0 = N, +CW) is optional; preset chips supply it. */
+  onSelect(point: GeoPoint, label: string, headingDeg?: number): void;
   onOpenKeyModal(): void;
 }
 
 export interface TitleHandle {
   root: HTMLElement;
-  show(): void;
+  show(midflight?: boolean): void;
   hide(): void;
 }
 
@@ -60,7 +61,7 @@ export function createTitle(handlers: TitleHandlers): TitleHandle {
     chip.type = 'button';
     chip.textContent = p.label;
     chip.addEventListener('click', () => {
-      handlers.onSelect({ lat: p.lat, lon: p.lon }, p.label);
+      handlers.onSelect({ lat: p.lat, lon: p.lon }, p.label, p.headingDeg);
     });
     presets.appendChild(chip);
   }
@@ -112,13 +113,15 @@ export function createTitle(handlers: TitleHandlers): TitleHandle {
 
   return {
     root,
-    show() {
+    show(midflight = false) {
       root.classList.remove('bfv-hidden');
+      root.classList.toggle('bfv-title-midflight', midflight);
       // Small delay before autofocus so the fade-in doesn't jitter the layout.
       setTimeout(() => input.focus({ preventScroll: true }), 60);
     },
     hide() {
       root.classList.add('bfv-hidden');
+      root.classList.remove('bfv-title-midflight');
     },
   };
 }
