@@ -80,7 +80,24 @@ fresh Opus agent, and review-fixed. 20 granular commits.
   across repeated takeoffs), production bundle smoked on the live URL, mobile
   title + flight verified (desktop is the real experience, as labeled).
 
-## Known gaps / next steps
+## Morning incident (2026-07-05 ~06:00) — found by Owen, fixed & redeployed
+
+Owen's close-range playtest caught buildings rendering as open shells (missing
+roofs, see-through walls) plus render flicker — bugs invisible in the original
+far-oblique verification screenshots. Root causes: MVT ring winding was never
+normalized (99.5% of extruded geometry was inside-out) and tile-buffer features
+were double-emitted (6.7% duplicate quads z-fighting). A follow-up dedupe
+regression (streets cut mid-block, ~18% of buildings dropped) was also caught
+and fixed. The permanent fix set: winding normalization at extraction,
+walls/roofs wound to match their normals, point-anchor polygon ownership,
+Liang–Barsky line clipping to tile bounds, party-wall dedupe.
+
+**Process fix that outlives the bug:** `audit.html` — a numeric geometry-audit
+harness (winding fractions, roof-raycast coverage, duplicate-quad rate) with
+hard gates, plus headed-browser play-through scripts at real frame rates
+(headless SwiftShader runs physics in slow motion — landing can only be tested
+headed). Final state verified on the live site: audit gates 99.5%/99.9%/100%/
+0.16%, scripted roof landing → perched on production, zero console errors.
 
 - **Photoreal mode is code-complete but needs your key to runtime-verify** —
   smoke page: `/photo-demo.html?key=YOUR_KEY` (or the in-app modal). Everything
