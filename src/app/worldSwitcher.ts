@@ -4,6 +4,12 @@
  * App delegates takeoff and mode-switch here so the coordinator itself only
  * has to think about renderer/scene/loop. This is stateful (holds the
  * current WorldSource + last takeoff origin) but has no runtime timers.
+ *
+ * Concurrency: each entry point (takeoff, switchKind) captures the current
+ * generation id on entry. After EVERY await, if the id no longer matches,
+ * the operation is stale — dispose whatever it just built and bail silently.
+ * This guards against overlapping takeoffs from rapid clicks or
+ * Escape+preset toggling.
  */
 import type { Scene, Vector3 } from 'three';
 import { GOOGLE_KEY_STORAGE } from '../config';
@@ -25,6 +31,9 @@ export class WorldSwitcher {
   private worldKind: WorldKind = 'dream';
   private lastOrigin: GeoPoint | null = null;
 
+  /** Monotonic id bumped on every entry to a lifecycle operation. */
+  private gen = 0;
+
   constructor(
     private readonly scene: Scene,
     private readonly ui: UiApi,
@@ -41,47 +50,78 @@ export class WorldSwitcher {
 
   /**
    * Fresh takeoff: replace any current world with a new one at `origin`.
-   * Returns the ground hit under the takeoff column, or null if none.
+   * Returns the ground hit under the takeoff column, or null if none or if a
+   * newer takeoff started while this one was in flight.
    */
   async takeoff(
     origin: GeoPoint,
     probe: Vector3,
     maxProbeDist: number,
   ): Promise<{ world: WorldSource; groundY: number } | null> {
+    const myGen = ++this.gen;
     this.ui.setError(null);
     this.ui.setLoading('finding your sky…');
 
+    // Local — never touch `this.world` until we're sure our gen still wins.
+    let local: WorldSource | null = null;
+
     try {
+      // Tear down the previous world synchronously (before any await).
       if (this.world) {
         this.scene.remove(this.world.root);
         this.world.dispose();
+        this.world = null;
       }
+
       // Honor the requested WorldKind — if photo mode was armed before
       // takeoff but the key is missing or the load fails, fall through to
       // dream so the user still gets a world.
+      const kindAtStart = this.worldKind;
       try {
-        this.world = await this.buildForKind(this.worldKind);
+        local = await this.buildForKind(kindAtStart);
       } catch (photoErr) {
+        if (this.gen !== myGen) {
+          // Stale before we even had something to dispose.
+          return null;
+        }
         console.warn('photoreal build failed at takeoff — falling back to dream', photoErr);
         this.ui.setError('photoreal tiles didn’t load — flying dream instead.');
         this.worldKind = 'dream';
-        this.world = this.factories.world();
+        local = this.factories.world();
       }
-      this.hooks.onBuilt(this.world);
-      this.scene.add(this.world.root);
-      await this.world.init(origin);
+      if (this.gen !== myGen) {
+        local.dispose();
+        return null;
+      }
 
+      this.hooks.onBuilt(local);
+      this.scene.add(local.root);
+      await local.init(origin);
+      if (this.gen !== myGen) {
+        this.scene.remove(local.root);
+        local.dispose();
+        return null;
+      }
+
+      // We won — commit.
+      this.world = local;
       this.lastOrigin = origin;
-      const hit = this.world.groundBelow(probe, maxProbeDist);
+      const hit = local.groundBelow(probe, maxProbeDist);
       const groundY = hit ? hit.point.y : 0;
-      this.hooks.onReady(this.world);
-      return { world: this.world, groundY };
+      this.hooks.onReady(local);
+      return { world: local, groundY };
     } catch (err) {
+      // If we're stale, don't clobber a newer operation's toast.
+      if (this.gen !== myGen) return null;
       console.error('takeoff failed', err);
       this.ui.setError('couldn’t spin up the world — try another address.');
+      if (local) {
+        this.scene.remove(local.root);
+        local.dispose();
+      }
       return null;
     } finally {
-      this.ui.setLoading(null);
+      if (this.gen === myGen) this.ui.setLoading(null);
     }
   }
 
@@ -107,6 +147,10 @@ export class WorldSwitcher {
     this.worldKind = kind;
     if (!this.lastOrigin) return;
 
+    const myGen = ++this.gen;
+    const originAtStart = this.lastOrigin;
+    let local: WorldSource | null = null;
+
     this.ui.setLoading(kind === 'photo' ? 'loading photoreal tiles…' : 'back to the dream…');
     try {
       if (this.world) {
@@ -114,35 +158,70 @@ export class WorldSwitcher {
         this.world.dispose();
         this.world = null;
       }
-      this.world = await this.buildForKind(kind, apiKey);
-      this.hooks.onBuilt(this.world);
-      this.scene.add(this.world.root);
-      await this.world.init(this.lastOrigin);
-      this.hooks.onReady(this.world);
+
+      local = await this.buildForKind(kind, apiKey);
+      if (this.gen !== myGen) {
+        local.dispose();
+        return;
+      }
+      this.hooks.onBuilt(local);
+      this.scene.add(local.root);
+      await local.init(originAtStart);
+      if (this.gen !== myGen) {
+        this.scene.remove(local.root);
+        local.dispose();
+        return;
+      }
+      this.world = local;
+      this.hooks.onReady(local);
     } catch (err) {
+      if (this.gen !== myGen) {
+        // Stale — clean up our partial and let the newer op speak.
+        if (local) {
+          this.scene.remove(local.root);
+          local.dispose();
+        }
+        return;
+      }
       console.error('world switch failed', err);
       this.ui.setError(
         kind === 'photo'
           ? 'photoreal tiles didn’t load — check your key and try again.'
           : 'couldn’t rebuild the dream world.',
       );
-      // fall back to a fresh dream world so we're not left blank.
+      if (local) {
+        this.scene.remove(local.root);
+        local.dispose();
+      }
+      // Fall back to a fresh dream world so we're not left blank.
       this.worldKind = 'dream';
       try {
-        this.world = this.factories.world();
-        this.hooks.onBuilt(this.world);
-        this.scene.add(this.world.root);
-        await this.world.init(this.lastOrigin);
-        this.hooks.onReady(this.world);
+        const fallback = this.factories.world();
+        if (this.gen !== myGen) {
+          fallback.dispose();
+          return;
+        }
+        this.hooks.onBuilt(fallback);
+        this.scene.add(fallback.root);
+        await fallback.init(originAtStart);
+        if (this.gen !== myGen) {
+          this.scene.remove(fallback.root);
+          fallback.dispose();
+          return;
+        }
+        this.world = fallback;
+        this.hooks.onReady(fallback);
       } catch {
-        // give up quietly — next takeoff will retry.
+        // Give up quietly — next takeoff will retry.
       }
     } finally {
-      this.ui.setLoading(null);
+      if (this.gen === myGen) this.ui.setLoading(null);
     }
   }
 
   dispose(): void {
+    // Bump the gen so any in-flight op knows to bail before mutating state.
+    this.gen++;
     if (this.world) {
       this.scene.remove(this.world.root);
       this.world.dispose();

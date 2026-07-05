@@ -7,7 +7,7 @@
  * modules and won't typecheck until they land. This file reimplements the
  * App flow's shape at a small scale for verification.
  */
-import { Clock, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import { PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three';
 import { GOOGLE_KEY_STORAGE, START_ALTITUDE_M } from '../config';
 import type { HudState, UiApi, WorldKind, WorldSource, GeoPoint } from '../types';
 import { installSky } from '../app/sky';
@@ -53,7 +53,7 @@ function boot(): void {
   titleCam.position.set(0, 40, 120);
   titleCam.lookAt(0, 30, 0);
 
-  const clock = new Clock();
+  const timer = new Timer();
   const state: AppState = {
     world: null,
     bird: null,
@@ -164,7 +164,8 @@ function boot(): void {
 
   const loop = (): void => {
     requestAnimationFrame(loop);
-    const dt = Math.min(0.05, clock.getDelta());
+    timer.update();
+    const dt = Math.min(0.05, timer.getDelta());
     if (state.flying && state.world && state.bird) {
       state.bird.update(dt, {} as never, state.world);
       state.world.update(state.bird.camera.position, dt);

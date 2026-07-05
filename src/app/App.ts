@@ -3,9 +3,9 @@
  * delegated to WorldSwitcher; sky/light/fog to sky.ts. State lives here.
  */
 import {
-  Clock,
   PerspectiveCamera,
   Scene,
+  Timer,
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -94,7 +94,7 @@ export class App {
   private readonly renderer: WebGLRenderer;
   private readonly scene: Scene;
   private readonly titleCamera: PerspectiveCamera;
-  private readonly clock = new Clock();
+  private readonly timer = new Timer();
   private readonly switcher: WorldSwitcher;
 
   private bird: BirdSystemApi | null = null;
@@ -205,7 +205,9 @@ export class App {
     if (this.disposed) return;
     this.rafId = requestAnimationFrame(this.loop);
 
-    const dt = Math.min(MAX_DT_S, this.clock.getDelta());
+    // Timer.update() before getDelta(); Timer replaces the deprecated Clock.
+    this.timer.update();
+    const dt = Math.min(MAX_DT_S, this.timer.getDelta());
     const world = this.switcher.current;
 
     if (this.flying && world && this.bird && this.input) {

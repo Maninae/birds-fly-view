@@ -60,11 +60,14 @@ export function createHud(): HudHandle {
       const head = compassLabel(state.headingDeg);
       const line = `${alt} m · ${head} · ${kmh} km/h`;
       if (line !== lastReadoutText) {
-        // dots for spacing so the mono font stays crisp.
-        readout.innerHTML =
-          `<span>${alt} m</span><span class="dot">·</span>` +
-          `<span>${head}</span><span class="dot">·</span>` +
-          `<span>${kmh} km/h</span>`;
+        // Build with textContent'd spans — dots for spacing so the mono font
+        // stays crisp, no interpolation of user-influenced values into HTML.
+        readout.textContent = '';
+        appendSpan(readout, `${alt} m`);
+        appendDot(readout);
+        appendSpan(readout, head);
+        appendDot(readout);
+        appendSpan(readout, `${kmh} km/h`);
         lastReadoutText = line;
         wake();
       }
@@ -90,6 +93,19 @@ function compassLabel(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
   return dirs[idx];
+}
+
+function appendSpan(parent: HTMLElement, text: string): void {
+  const s = document.createElement('span');
+  s.textContent = text;
+  parent.appendChild(s);
+}
+
+function appendDot(parent: HTMLElement): void {
+  const s = document.createElement('span');
+  s.className = 'dot';
+  s.textContent = '·';
+  parent.appendChild(s);
 }
 
 function mk(tag: string, cls: string): HTMLElement {
