@@ -44,8 +44,6 @@ import {
   MAX_PITCH,
   MAX_STEP_M,
   MIN_AIRSPEED,
-  MOUSE_PITCH_PER_PX,
-  MOUSE_YAW_PER_PX,
   PITCH_RATE,
   SPEED_RESTORE,
   YAW_AT_MAX_BANK,
@@ -104,30 +102,22 @@ function advance(
   world: WorldSource,
   dt: number,
 ): FlightStepResult {
-  // --- steering: target bank/pitch from mouse or key axes ------------------
-  // Mouse takes priority when there's motion; keys fill in otherwise.
-  const mouseX = input.pointerLocked ? input.mouseDX : input.mouseDX * 0.5;
-  const mouseY = input.pointerLocked ? input.mouseDY : input.mouseDY * 0.5;
-
-  const bankFromMouse = mouseX * MOUSE_YAW_PER_PX * 60; // scale to per-frame target
-  const bankFromKeys = input.turn * MAX_BANK;
-  const bankTarget = clamp(bankFromKeys + bankFromMouse, -MAX_BANK, MAX_BANK);
-
-  const pitchFromMouse = -mouseY * MOUSE_PITCH_PER_PX * 60;
-  const pitchFromKeys = input.pitchAxis * MAX_PITCH;
-  let pitchTarget = clamp(pitchFromKeys + pitchFromMouse, -MAX_PITCH, MAX_PITCH);
+  // --- steering: target bank/pitch from key axes only ----------------------
+  // (Mouse input is deliberately ignored; the bird never follows the mouse.)
+  const bankTarget = clamp(input.turn * MAX_BANK, -MAX_BANK, MAX_BANK);
+  let pitchTarget = clamp(input.pitchAxis * MAX_PITCH, -MAX_PITCH, MAX_PITCH);
 
   // --- auto-flare when low --------------------------------------------------
   // Peek the surface directly below. When we're close to it and the player
-  // isn't diving toward a landing, bend the pitch upward.
+  // isn't pulling the nose up toward a landing, bend the pitch upward.
   const belowHit = world.groundBelow(pose.position);
   const altitude = belowHit
     ? Math.max(0, pose.position.y - belowHit.point.y)
     : Infinity;
 
-  // Skip flare if the player is deliberately braking — they're settling in.
-  // A nose-up shuttlecock read on brake+descend is worse than a gentle sink.
-  const wantsToLand = input.forward < -0.1 && pose.speed < LAND_MAX_SPEED;
+  // "Pulling back" now reads off pitchAxis (S/↓ → +ve = nose up). Brake still
+  // suppresses flare — brake+descend should stay level, not shuttlecock.
+  const wantsToLand = input.pitchAxis > 0.1 && pose.speed < LAND_MAX_SPEED;
   if (altitude < FLARE_ALTITUDE && !wantsToLand && !input.brake) {
     const t = 1 - altitude / FLARE_ALTITUDE;
     pitchTarget = Math.max(pitchTarget, FLARE_PITCH * t);
@@ -138,8 +128,8 @@ function advance(
 
   // --- bank/pitch/roll integration ----------------------------------------
   // If the player is inputting, chase the target; otherwise decay to zero.
-  const hasSteerInput = Math.abs(input.turn) > 0.01 || Math.abs(mouseX) > 0.1;
-  const hasPitchInput = Math.abs(input.pitchAxis) > 0.01 || Math.abs(mouseY) > 0.1;
+  const hasSteerInput = Math.abs(input.turn) > 0.01;
+  const hasPitchInput = Math.abs(input.pitchAxis) > 0.01;
 
   if (hasSteerInput) {
     pose.roll = approach(pose.roll, bankTarget, BANK_RATE * dt);

@@ -46,7 +46,6 @@ const _fwd = new Vector3();
 const _right = new Vector3();
 const _pos = new Vector3();
 const _lookAt = new Vector3();
-const _tmp = new Vector3();
 
 export class CameraRig {
   readonly camera: PerspectiveCamera;
@@ -131,14 +130,6 @@ export class CameraRig {
     this.camera.lookAt(this.smoothLook);
     this.camera.fov = this.smoothFov;
     this.camera.updateProjectionMatrix();
-  }
-
-  /** Yaw the camera is currently facing, for walk-relative movement. */
-  currentYaw(): number {
-    // Compute yaw from the smoothed look-vector so walk feels tied to view.
-    _tmp.subVectors(this.smoothLook, this.smoothPos);
-    // yaw such that headingVector(yaw) = (dx, 0, dz).
-    return Math.atan2(_tmp.x, -_tmp.z);
   }
 
   // --- target composition ---------------------------------------------------

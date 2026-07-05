@@ -30,7 +30,8 @@ Type any Bay Area address and spawn as a bird above it. The world below is real 
 
 | Input | Action |
 |---|---|
-| mouse (click to lock) or <kbd>A</kbd>/<kbd>D</kbd> + arrows | steer — bank to turn, pitch to trade height for speed |
+| <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> | bank to turn |
+| <kbd>W</kbd>/<kbd>S</kbd> or <kbd>↑</kbd>/<kbd>↓</kbd> | pitch — trade height for speed |
 | <kbd>Space</kbd> | flap (hold for a climb; hold on the ground to take off) |
 | <kbd>Shift</kbd> | air brake — bleeds speed hard when you're low and committing to land |
 | <kbd>E</kbd> | land on the surface below / take off from a perch |

@@ -153,9 +153,9 @@ export class BirdSystem implements BirdSystemApi {
   }
 
   private tickWalking(dt: number, input: InputState, world: WorldSource): void {
-    // Walk moves relative to the camera yaw so "W" goes where the player looks.
-    const yaw = this.rig.currentYaw();
-    const res = stepWalk(this.pose, this.walk, input, world, yaw, dt);
+    // Walk is keyboard-only, relative to the bird's own facing (A/D turn,
+    // W/S walk). The camera already tracks pose.yaw in `camera.ts`.
+    const res = stepWalk(this.pose, this.walk, input, world, dt);
     if (res.takeoff) this.beginTakeoff();
 
     // In walking mode the landing prompt is silenced.

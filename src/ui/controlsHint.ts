@@ -18,7 +18,7 @@ export function createControlsHint(): ControlsHintHandle {
   root.className = 'bfv-controls-hint';
   root.style.display = 'none';
   root.innerHTML = `
-    <div><kbd>mouse</kbd> steers</div>
+    <div><kbd>A</kbd><kbd>D</kbd> turn · <kbd>W</kbd><kbd>S</kbd> dive/climb</div>
     <div><kbd>space</kbd> flaps · <kbd>shift</kbd> brakes</div>
     <div><kbd>E</kbd> lands · <kbd>V</kbd> camera</div>
   `;

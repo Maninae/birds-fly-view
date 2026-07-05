@@ -24,6 +24,22 @@ bird/
   for why. `headingVector(yaw)` in `flight.ts` is the canonical conversion.
 - The bird owns `camera`. App never creates a camera of its own; it just
   renders through `bird.camera`.
+- **Keyboard-only.** Owner directive: the bird never follows the mouse. Neither
+  `flight.ts` nor `walk.ts` reads `mouseDX/DY`, and `input.ts` never requests
+  pointer lock. The `mouseDX/DY/pointerLocked` fields stay on `InputState`
+  because `types.ts` is locked, but they always read 0 / false.
+
+## Control mapping (keyboard only)
+
+| Input | Flight | Walk |
+|---|---|---|
+| A/D or ←/→ | bank (target roll → coordinated yaw) | turn `pose.yaw` in place |
+| W/S or ↑/↓ | pitch — stick-style, ↓/S = nose up | walk forward/back along facing |
+| Space (tap) | flap impulse | hop |
+| Space (hold) | wing-beat rhythm | ≥ `WALK_TAKEOFF_HOLD` → takeoff |
+| Shift | air brake (harder below 30 m) | — |
+| E | land (assist swoop onto `landingCandidate`) | takeoff |
+| V | chase ⇄ first-person cam | same |
 
 ## State machine (all internal)
 

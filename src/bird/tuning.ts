@@ -52,9 +52,8 @@ export const AUTOLEVEL_PITCH = Math.PI * 45 / 180;
 /** Yaw rate at max bank; scales with sin(bank) for coordinated turn. */
 export const YAW_AT_MAX_BANK = Math.PI * 70 / 180;   // ~70°/s
 
-// Mouse sensitivity (pointer-locked steering).
-export const MOUSE_YAW_PER_PX = 0.0025;  // px → target bank rad
-export const MOUSE_PITCH_PER_PX = 0.0018;
+// (Mouse sensitivity constants were removed — the bird never follows the
+// mouse. Keyboard is the only steering surface.)
 
 // -- Ground / landing -------------------------------------------------------
 

@@ -3,17 +3,21 @@
  *
  * Produces a per-frame `InputState` snapshot. All other modules (bird, app) only
  * read `.state`. Consumers call `endFrame()` at the end of every frame so that
- * edge-triggered flags (`flap`, `interact`, `toggleCam`) and mouse deltas reset.
+ * edge-triggered flags (`flap`, `interact`, `toggleCam`) reset.
  *
- * Controls (must all work with and without pointer lock — first-run matters):
- *   forward   W/S     or ↑/↓
- *   turn      A/D     or ←/→
- *   pitchAxis ↑/↓     (arrows also drive pitch — gamepad-style)
- *   flap      Space   (edge + held)
- *   brake     Shift   (held)
- *   interact  E       (edge)
- *   toggleCam V       (edge)
- *   look      mouse   (pointer-locked steering; also plain mousemove works)
+ * Keyboard-only by design — mouse motion is IGNORED (owner feedback: don't
+ * make it follow the mouse). `mouseDX`/`mouseDY`/`pointerLocked` remain on
+ * `InputState` because the contract in `types.ts` is locked, but they always
+ * read zero / false. No pointer-lock request happens on canvas click.
+ *
+ * Controls:
+ *   forward    W/S     or ↑/↓           (walk mode: move / flight: unused)
+ *   turn       A/D     or ←/→           (bank in flight; turn-in-place in walk)
+ *   pitchAxis  ↑/↓     also W/S         (climb/dive; stick-style: down = nose up)
+ *   flap       Space   (edge + held)
+ *   brake      Shift   (held)
+ *   interact   E       (edge — land / take off)
+ *   toggleCam  V       (edge — chase ⇄ first-person)
  */
 import type { InputState } from './types.js';
 
@@ -22,7 +26,6 @@ type Writable<T> = { -readonly [K in keyof T]: T[K] };
 export class InputManager {
   readonly state: InputState;
 
-  private readonly target: HTMLElement;
   private readonly keys = new Set<string>();
 
   // Edge-trigger latches, drained by endFrame().
@@ -30,17 +33,12 @@ export class InputManager {
   private interactEdge = false;
   private toggleCamEdge = false;
 
-  // Mouse deltas accumulate across the frame; drained by endFrame().
-  private mdx = 0;
-  private mdy = 0;
-
-  constructor(target: HTMLElement) {
-    this.target = target;
+  constructor(_target: HTMLElement) {
     this.state = {
       forward: 0,
       turn: 0,
       pitchAxis: 0,
-      mouseDX: 0,
+      mouseDX: 0,      // always 0 — mouse steering removed
       mouseDY: 0,
       flap: false,
       flapHold: false,
@@ -53,42 +51,30 @@ export class InputManager {
     // Bind once so we can remove on dispose.
     this.onKeyDown = this.onKeyDown.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
-    this.onMouseMove = this.onMouseMove.bind(this);
-    this.onPointerLockChange = this.onPointerLockChange.bind(this);
-    this.onClickForLock = this.onClickForLock.bind(this);
     this.onBlur = this.onBlur.bind(this);
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    // Track mouse everywhere — pointer-lock delivers movementX/Y through window too.
-    window.addEventListener('mousemove', this.onMouseMove);
-    document.addEventListener('pointerlockchange', this.onPointerLockChange);
-    target.addEventListener('click', this.onClickForLock);
     window.addEventListener('blur', this.onBlur);
+    // Deliberately NO mouse / pointer-lock / click listeners: mouse input is
+    // ignored, and clicking the canvas must not grab the pointer.
   }
 
-  /** Clear edge flags and mouse deltas. Call once at the end of each frame. */
+  /** Clear edge flags. Call once at the end of each frame. */
   endFrame(): void {
     const s = this.state as Writable<InputState>;
     s.flap = false;
     s.interact = false;
     s.toggleCam = false;
-    s.mouseDX = 0;
-    s.mouseDY = 0;
     this.flapEdge = false;
     this.interactEdge = false;
     this.toggleCamEdge = false;
-    this.mdx = 0;
-    this.mdy = 0;
     this.recomputeAxes();
   }
 
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
-    window.removeEventListener('mousemove', this.onMouseMove);
-    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
-    this.target.removeEventListener('click', this.onClickForLock);
     window.removeEventListener('blur', this.onBlur);
     this.keys.clear();
   }
@@ -125,29 +111,6 @@ export class InputManager {
     this.pushState();
   }
 
-  private onMouseMove(e: MouseEvent): void {
-    this.mdx += e.movementX ?? 0;
-    this.mdy += e.movementY ?? 0;
-    const s = this.state as Writable<InputState>;
-    s.mouseDX = this.mdx;
-    s.mouseDY = this.mdy;
-  }
-
-  private onPointerLockChange(): void {
-    const s = this.state as Writable<InputState>;
-    s.pointerLocked = document.pointerLockElement === this.target;
-  }
-
-  private onClickForLock(): void {
-    if (document.pointerLockElement !== this.target) {
-      // Async in some browsers; some throw if user hasn't gestured. Fire-and-forget.
-      const req = this.target.requestPointerLock?.();
-      if (req && typeof (req as Promise<void>).then === 'function') {
-        (req as Promise<void>).catch(() => {});
-      }
-    }
-  }
-
   private onBlur(): void {
     // Prevent stuck keys when the window loses focus mid-hold.
     this.keys.clear();
@@ -179,11 +142,12 @@ export class InputManager {
     if (k.has('KeyD') || k.has('ArrowRight')) t += 1;
     if (k.has('KeyA') || k.has('ArrowLeft')) t -= 1;
     s.turn = t;
-    // Pitch: arrow up/down as gamepad-style pitch (down = nose up, up = nose down).
-    // This mirrors classic flight-sim pitch: pulling "back" (↓) raises the nose.
+    // Pitch: stick-style — pulling "back" (↓ or S) raises the nose (positive),
+    // pushing "forward" (↑ or W) drops it. Both hands work equivalently in flight;
+    // in walk mode the same keys drive `forward` and pitchAxis is ignored.
     let p = 0;
-    if (k.has('ArrowDown')) p += 1;
-    if (k.has('ArrowUp')) p -= 1;
-    s.pitchAxis = p;
+    if (k.has('ArrowDown') || k.has('KeyS')) p += 1;
+    if (k.has('ArrowUp') || k.has('KeyW')) p -= 1;
+    s.pitchAxis = p < -1 ? -1 : p > 1 ? 1 : p;
   }
 }

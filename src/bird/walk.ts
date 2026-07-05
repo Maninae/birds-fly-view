@@ -1,17 +1,18 @@
 /**
  * WalkController — updates BirdPose during 'walking' mode.
  *
- * Feel: 2.5 m/s waddle relative to camera-facing heading (see below); Space taps
- * hop, Space held ≥ WALK_TAKEOFF_HOLD seconds initiates takeoff (BirdSystem
- * observes the return flag and swaps controllers).
+ * Keyboard-only, first-person-shooter style:
+ *   A/D (or ←/→)   turn the bird IN PLACE around its own yaw.
+ *   W/S (or ↑/↓)   walk forward/back along the bird's current facing.
+ *   Space (tap)    hop.
+ *   Space (hold) ≥ WALK_TAKEOFF_HOLD, or E   takeoff (returned as `takeoff`).
  *
- * "Forward relative to camera heading" is what the brief calls for. The
- * BirdSystem's camera-rig owns the yaw the player is currently looking down; we
- * take that yaw as an argument each frame so this module stays pure.
+ * The chase / first-person camera already tracks `pose.yaw` in `camera.ts`,
+ * so turning the bird turns the view — no mouse-look ever.
  */
 import { Vector3 } from 'three';
 import type { BirdPose, InputState, WorldSource } from '../types.js';
-import { approach, clamp, headingVector } from './flight.js';
+import { approach, headingVector } from './flight.js';
 import {
   WALK_ACCEL,
   WALK_BOB_AMPL,
@@ -43,41 +44,33 @@ export function newWalkMemory(): WalkMemory {
 }
 
 const _fwd = new Vector3();
-const _right = new Vector3();
 
 /**
- * Advance the walking pose one step. `cameraYaw` is the yaw the camera is
- * currently at — walk axis is relative to this, so "W" goes where the player
- * is looking.
+ * Advance the walking pose one step. Turn (A/D) rotates yaw in place; forward
+ * (W/S) walks along the bird's own heading. No camera coupling.
  */
 export function stepWalk(
   pose: BirdPose,
   mem: WalkMemory,
   input: InputState,
   world: WorldSource,
-  cameraYaw: number,
   dt: number,
 ): WalkStepResult {
-  // Facing direction: walk direction is camera-relative, so the bird points
-  // where you push, not where the camera is aimed.
-  headingVector(cameraYaw, _fwd);
-  _right.set(-_fwd.z, 0, _fwd.x);   // right = 90° clockwise of forward
+  // Turn in place: A/D directly rotate yaw.
+  if (Math.abs(input.turn) > 0.01) {
+    pose.yaw = wrapAngle(pose.yaw + input.turn * WALK_TURN_RATE * dt);
+  }
 
-  // Desired planar velocity from WASD/arrows.
-  const desiredX = (_fwd.x * input.forward + _right.x * input.turn) * WALK_SPEED;
-  const desiredZ = (_fwd.z * input.forward + _right.z * input.turn) * WALK_SPEED;
+  // Forward along current facing.
+  headingVector(pose.yaw, _fwd);
+  const desiredX = _fwd.x * input.forward * WALK_SPEED;
+  const desiredZ = _fwd.z * input.forward * WALK_SPEED;
 
-  // Approach the target velocity (smooth accel).
+  // Smooth accel onto the target planar velocity.
   mem.velX = approach(mem.velX, desiredX, WALK_ACCEL * dt);
   mem.velZ = approach(mem.velZ, desiredZ, WALK_ACCEL * dt);
-
-  // Turn the mesh to face movement direction.
   const moving = Math.hypot(mem.velX, mem.velZ);
-  if (moving > 0.05) {
-    // Yaw so that headingVector(yaw) aligns with (velX, velZ).
-    const targetYaw = Math.atan2(mem.velX, -mem.velZ);
-    pose.yaw = approachAngle(pose.yaw, targetYaw, WALK_TURN_RATE * dt);
-  }
+
   pose.pitch = approach(pose.pitch, 0, WALK_TURN_RATE * dt);
   pose.roll = approach(pose.roll, 0, WALK_TURN_RATE * dt);
 
@@ -138,15 +131,9 @@ export function stepWalk(
 
 // -- angle helpers ---------------------------------------------------------
 
-function approachAngle(from: number, to: number, step: number): number {
-  let delta = to - from;
-  // Wrap to (−π, π] so we take the short way around.
-  const pi = Math.PI;
-  while (delta > pi) delta -= 2 * pi;
-  while (delta < -pi) delta += 2 * pi;
-  if (Math.abs(delta) <= step) return to;
-  return from + Math.sign(delta) * step;
+/** Wrap an angle to (−π, π] so pose.yaw stays bounded. */
+function wrapAngle(a: number): number {
+  const twoPi = Math.PI * 2;
+  a = ((a + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
+  return a;
 }
-
-// Silences noUnusedImports when tree-shaking; clamp is exported by flight.
-export { clamp };

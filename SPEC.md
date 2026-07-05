@@ -34,7 +34,9 @@ Verified open gaps, which this project occupies:
 - **Bird:** visible low-poly bird (third-person chase cam, first-person toggle).
   Flap for lift, glide, bank into turns, dive to gain speed. Floaty, forgiving, no stall.
 - **Perch:** slow near any rooftop → landing prompt → perch. Look around. Take off again.
-- **Walk:** land on the ground → walk mode (WASD + mouse look) at street level.
+- **Walk:** land on the ground → walk mode (keyboard: W/S walk, A/D turn) at
+  street level. All controls are keyboard-only — the bird never follows the
+  mouse (owner directive 2026-07-05).
   Jump-flap to take off.
 - **UI:** poetic minimum. Place name, compass heading, altitude. Controls hint that
   fades. Attribution footer (required: OSM/OpenFreeMap/Photon/Terrain sources).
