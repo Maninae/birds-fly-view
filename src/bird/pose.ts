@@ -23,28 +23,30 @@ export interface WalkHandles {
   rightFoot: Object3D;
 }
 
-/** Wings flap on flapPhase; slight glide dihedral. Feet tuck back. */
+/** Persistent dihedral so wings read as a V from behind the chase cam. ~15°. */
+const BASE_DIHEDRAL = 0.26;
+
+/** Wings flap on flapPhase around a base dihedral; feet tuck. */
 export function applyFlyingPose(
   pose: BirdPose,
   wings: WingHandles,
   walk: WalkHandles,
 ): void {
   const p = pose.flapPhase;
-  const shoulder = Math.sin(p * Math.PI * 2) * 0.9;   // rad
-  const tipLag = Math.sin((p - 0.15) * Math.PI * 2) * 0.5;
+  // Amplitude smaller than before because the base already lifts the wings —
+  // a wide sine would flip through -Y and wrap ugly.
+  const flap = Math.sin(p * Math.PI * 2) * 0.55;
+  const tipLag = Math.sin((p - 0.15) * Math.PI * 2) * 0.4;
 
-  wings.rightShoulder.rotation.z = -shoulder;
-  wings.leftShoulder.rotation.z = shoulder;
+  // Right-wing-down is +Z rotation on the right shoulder in this rig; so
+  // "wing up" for the right side is a NEGATIVE Z. Base dihedral lifts both.
+  wings.rightShoulder.rotation.z = -BASE_DIHEDRAL - flap;
+  wings.leftShoulder.rotation.z = BASE_DIHEDRAL + flap;
 
   wings.rightMid.rotation.z = -tipLag * 0.4;
   wings.rightTip.rotation.z = -tipLag * 0.6;
   wings.leftMid.rotation.z = tipLag * 0.4;
   wings.leftTip.rotation.z = tipLag * 0.6;
-
-  // Dihedral only when the shoulder passes through neutral (mid-glide).
-  const dihedral = Math.max(0, 0.15 - Math.abs(shoulder) * 0.15);
-  wings.rightShoulder.rotation.z -= dihedral;
-  wings.leftShoulder.rotation.z += dihedral;
 
   walk.leftFoot.position.set(-0.05, -0.09, 0.10);
   walk.rightFoot.position.set(0.05, -0.09, 0.10);

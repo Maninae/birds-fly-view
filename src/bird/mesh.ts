@@ -16,6 +16,7 @@ import {
   BoxGeometry,
   BufferGeometry,
   ConeGeometry,
+  DoubleSide,
   Float32BufferAttribute,
   Group,
   Mesh,
@@ -34,12 +35,15 @@ import {
 } from './tuning.js';
 
 /** Shared flat-shaded material factory. */
-function mat(color: number, opts: { roughness?: number; metalness?: number } = {}) {
+function mat(color: number, opts: { roughness?: number; metalness?: number; doubleSide?: boolean } = {}) {
   return new MeshStandardMaterial({
     color,
     flatShading: true,
     roughness: opts.roughness ?? 0.85,
     metalness: opts.metalness ?? 0.0,
+    // Wings + tail are single-quad panels — draw both faces so viewing from
+    // above or below never renders them as invisible backfaces.
+    side: opts.doubleSide ? DoubleSide : undefined,
   });
 }
 
@@ -131,9 +135,13 @@ export class BirdMesh {
   constructor() {
     this.root = new Group();
     this.root.rotation.order = 'YXZ';
+    // Modest upscale so the silhouette reads instantly at ~6.5 m chase distance.
+    this.root.scale.setScalar(1.35);
 
     const bodyM = mat(COLOR_BODY);
-    const tipM = mat(COLOR_WINGTIP);
+    // Wing / tail panels are single-quad — use double-sided for readability.
+    const wingBodyM = mat(COLOR_BODY, { doubleSide: true });
+    const tipM = mat(COLOR_WINGTIP, { doubleSide: true });
     const accentM = mat(COLOR_ACCENT);
     const eyeM = mat(COLOR_EYE, { roughness: 0.4 });
 
@@ -156,10 +164,10 @@ export class BirdMesh {
     head.add(eyeR);
 
     // Wings anchored at shoulders on either side.
-    const leftWing = buildWing('left', bodyM, tipM);
+    const leftWing = buildWing('left', wingBodyM, tipM);
     leftWing.shoulder.position.set(-0.12, 0.03, -0.02);
     this.root.add(leftWing.shoulder);
-    const rightWing = buildWing('right', bodyM, tipM);
+    const rightWing = buildWing('right', wingBodyM, tipM);
     rightWing.shoulder.position.set(0.12, 0.03, -0.02);
     this.root.add(rightWing.shoulder);
 

@@ -23,6 +23,7 @@ import {
   CHASE_HALFLIFE_POS,
   CHASE_HALFLIFE_ROT,
   CHASE_LATERAL_LAG,
+  CHASE_LOOK_Y,
   CHASE_LOOKAHEAD,
   CHASE_UP,
   CRUISE_SPEED,
@@ -154,7 +155,7 @@ export class CameraRig {
     );
     outLook.set(
       pose.position.x + _fwd.x * CHASE_LOOKAHEAD,
-      pose.position.y + 0.2,
+      pose.position.y + CHASE_LOOK_Y,
       pose.position.z + _fwd.z * CHASE_LOOKAHEAD,
     );
   }

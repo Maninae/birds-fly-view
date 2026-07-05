@@ -79,9 +79,15 @@ export const WALK_BOB_AMPL = 0.05;
 
 // -- Camera rig -------------------------------------------------------------
 
-export const CHASE_BACK = 7.0;
-export const CHASE_UP = 2.2;
-export const CHASE_LOOKAHEAD = 1.2;   // aim slightly ahead of the bird
+export const CHASE_BACK = 6.5;
+/** Cam sits above the bird — target ~25° look-down (atan2(UP, BACK)) so we see
+ *  the top of the wings, not their edge. Horizon still fills the upper half. */
+export const CHASE_UP = 3.0;
+export const CHASE_LOOKAHEAD = 1.6;   // aim slightly ahead of the bird
+/** Vertical offset of the look-target relative to the bird. 0 = aim at body
+ *  center; slightly negative pulls the bird upward in frame so it sits ABOVE
+ *  the horizon line rather than half-buried in the ground. */
+export const CHASE_LOOK_Y = -0.15;
 /** Critical-damping half-life (s): time for spring to halve its error. */
 export const CHASE_HALFLIFE_POS = 0.14;
 export const CHASE_HALFLIFE_ROT = 0.10;

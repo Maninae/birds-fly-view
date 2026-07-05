@@ -123,8 +123,10 @@ function advance(
     ? Math.max(0, pose.position.y - belowHit.point.y)
     : Infinity;
 
+  // Skip flare if the player is deliberately braking — they're settling in.
+  // A nose-up shuttlecock read on brake+descend is worse than a gentle sink.
   const wantsToLand = input.forward < -0.1 && pose.speed < LAND_MAX_SPEED;
-  if (altitude < FLARE_ALTITUDE && !wantsToLand) {
+  if (altitude < FLARE_ALTITUDE && !wantsToLand && !input.brake) {
     const t = 1 - altitude / FLARE_ALTITUDE;
     pitchTarget = Math.max(pitchTarget, FLARE_PITCH * t);
     mem.flareCharge = Math.min(1, mem.flareCharge + dt * 3);
