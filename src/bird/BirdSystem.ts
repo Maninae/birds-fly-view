@@ -1,0 +1,227 @@
+/**
+ * BirdSystem — implements BirdSystemApi.
+ *
+ * Facade over: BirdMesh, FlightController, WalkController, CameraRig.
+ * Owns:
+ *   - the PerspectiveCamera (via CameraRig)
+ *   - BirdPose (mutated by controllers)
+ *   - the flying ⇄ perched ⇄ walking state machine
+ *
+ * State transitions (all internal, driven by `input.interact` + landing):
+ *   flying → perched     : landingCandidate.kind === 'building' & interact
+ *   flying → walking     : landingCandidate.kind === 'terrain'  & interact
+ *   perched → flying     : interact OR flap (hop off)
+ *   walking → flying     : hold Space ≥ WALK_TAKEOFF_HOLD, or interact
+ *
+ * Landing itself is a short ease (LAND_EASE_SEC): during ease the physics is
+ * paused and the bird is interpolated to the touchdown point/orientation.
+ */
+import { Group, Object3D, PerspectiveCamera, Vector3 } from 'three';
+import type {
+  AppMode,
+  BirdPose,
+  BirdSystemApi,
+  GroundHit,
+  InputState,
+  WorldSource,
+} from '../types.js';
+import { CameraRig } from './camera.js';
+import { newFlightMemory, stepFlight } from './flight.js';
+import type { FlightMemory, FlightStepResult } from './flight.js';
+import { BirdMesh } from './mesh.js';
+import { CRUISE_SPEED, LAND_EASE_SEC, LAND_HEIGHT } from './tuning.js';
+import { newWalkMemory, stepWalk } from './walk.js';
+import type { WalkMemory } from './walk.js';
+
+export class BirdSystem implements BirdSystemApi {
+  readonly object: Object3D;
+  readonly camera: PerspectiveCamera;
+  readonly pose: BirdPose;
+
+  private _mode: AppMode = 'flying';
+  private _landing: GroundHit | null = null;
+
+  private readonly mesh: BirdMesh;
+  private readonly rig: CameraRig;
+  private readonly flight: FlightMemory;
+  private readonly walk: WalkMemory;
+
+  /** Non-zero while easing between modes; when > 0 we interpolate. */
+  private easeT = 0;
+  private easeFrom = new Vector3();
+  private easeTo = new Vector3();
+  /** Latch: which mode to enter when the ease completes. */
+  private easeTargetMode: AppMode = 'flying';
+
+  constructor(aspect: number) {
+    this.mesh = new BirdMesh();
+    this.rig = new CameraRig(aspect);
+    this.camera = this.rig.camera;
+    this.object = wrapAsRoot(this.mesh.root);
+
+    this.flight = newFlightMemory();
+    this.walk = newWalkMemory();
+
+    this.pose = {
+      position: new Vector3(0, 100, 0),
+      yaw: 0,
+      pitch: 0,
+      roll: 0,
+      speed: CRUISE_SPEED,
+      flapPhase: 0,
+    };
+  }
+
+  get mode(): AppMode {
+    return this._mode;
+  }
+  get landingCandidate(): GroundHit | null {
+    return this._landing;
+  }
+
+  placeAt(position: Vector3, headingRad: number): void {
+    this.pose.position.copy(position);
+    this.pose.yaw = headingRad;
+    this.pose.pitch = 0;
+    this.pose.roll = 0;
+    this.pose.speed = CRUISE_SPEED;
+    this.pose.flapPhase = 0;
+    this._mode = 'flying';
+    this._landing = null;
+    this.easeT = 0;
+    this.flight.vy = 0;
+    this.flight.timeSinceBeat = 999;
+    this.flight.flareCharge = 0;
+    this.walk.velX = 0;
+    this.walk.velY = 0;
+    this.walk.velZ = 0;
+    this.walk.spaceHold = 0;
+    this.walk.bobT = 0;
+  }
+
+  resize(aspect: number): void {
+    this.rig.resize(aspect);
+  }
+
+  update(dt: number, input: InputState, world: WorldSource): void {
+    // Clamp dt so a paused tab doesn't teleport the bird on resume.
+    dt = Math.min(dt, 0.1);
+
+    if (this.easeT > 0) {
+      this.tickEase(dt);
+    } else {
+      switch (this._mode) {
+        case 'flying':
+          this.tickFlying(dt, input, world);
+          break;
+        case 'walking':
+          this.tickWalking(dt, input, world);
+          break;
+        case 'perched':
+          this.tickPerched(dt, input);
+          break;
+      }
+    }
+
+    // Update visual mesh + camera every frame regardless of mode.
+    this.mesh.update(this.pose, this._mode, dt);
+    this.rig.update(this.pose, this._mode, input, world, dt);
+  }
+
+  // --- per-mode ticks ------------------------------------------------------
+
+  private tickFlying(dt: number, input: InputState, world: WorldSource): void {
+    const res: FlightStepResult = stepFlight(this.pose, this.flight, input, world, dt);
+    this._landing = res.landing;
+
+    if (input.interact && this._landing) {
+      this.beginLandingEase(this._landing);
+    }
+  }
+
+  private tickWalking(dt: number, input: InputState, world: WorldSource): void {
+    // Walk moves relative to the camera yaw so "W" goes where the player looks.
+    const yaw = this.rig.currentYaw();
+    const res = stepWalk(this.pose, this.walk, input, world, yaw, dt);
+    if (res.takeoff) this.beginTakeoff();
+
+    // In walking mode the landing prompt is silenced.
+    this._landing = null;
+  }
+
+  private tickPerched(_dt: number, input: InputState): void {
+    // Perched idle: pose unchanged. flapPhase drifts inside BirdMesh idle.
+    if (input.interact || input.flap) {
+      this.beginTakeoff();
+    }
+    this._landing = null;
+  }
+
+  // --- transitions ---------------------------------------------------------
+
+  private beginLandingEase(hit: GroundHit): void {
+    this.easeFrom.copy(this.pose.position);
+    this.easeTo.copy(hit.point);
+    // Small vertical offset so we sit ON the surface, not embedded.
+    this.easeTo.y += 0.02;
+    this.easeT = LAND_EASE_SEC;
+    this.easeTargetMode = hit.kind === 'building' ? 'perched' : 'walking';
+    // Zero out physics-carried velocity so touchdown is clean.
+    this.flight.vy = 0;
+  }
+
+  private tickEase(dt: number): void {
+    this.easeT -= dt;
+    const p = 1 - Math.max(0, this.easeT / LAND_EASE_SEC);
+    // Ease-out cubic — a soft settle.
+    const k = 1 - Math.pow(1 - p, 3);
+    this.pose.position.lerpVectors(this.easeFrom, this.easeTo, k);
+    // Level out orientation during ease.
+    this.pose.pitch *= (1 - k);
+    this.pose.roll *= (1 - k);
+    this.pose.speed *= (1 - k);
+
+    if (this.easeT <= 0) {
+      this.easeT = 0;
+      this._mode = this.easeTargetMode;
+      this.pose.speed = 0;
+      this.pose.pitch = 0;
+      this.pose.roll = 0;
+      this.pose.position.copy(this.easeTo);
+      // Fresh walk memory so we don't inherit any residual velocity.
+      if (this._mode === 'walking') {
+        this.walk.velX = 0;
+        this.walk.velY = 0;
+        this.walk.velZ = 0;
+        this.walk.spaceHold = 0;
+        this.walk.grounded = true;
+      }
+    }
+  }
+
+  private beginTakeoff(): void {
+    // Reset flight memory and pop up a bit so the very-next flight tick
+    // doesn't immediately re-detect a landing candidate.
+    this.pose.position.y += LAND_HEIGHT * 0.6;
+    this.pose.speed = CRUISE_SPEED * 0.7;
+    this.pose.pitch = 0.1;   // slight climb
+    this.pose.roll = 0;
+    this.flight.vy = 5;      // wing burst
+    this.flight.timeSinceBeat = 0;
+    this.flight.flareCharge = 0;
+    this._mode = 'flying';
+    this._landing = null;
+  }
+}
+
+/**
+ * The public `object` slot exists so App can `scene.add(bird.object)`. We wrap
+ * the mesh root in a stable Group so callers don't hold a reference that we
+ * ever swap out.
+ */
+function wrapAsRoot(inner: Object3D): Object3D {
+  const g = new Group();
+  g.name = 'bird-root';
+  g.add(inner);
+  return g;
+}
