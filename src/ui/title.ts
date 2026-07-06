@@ -41,6 +41,15 @@ export function createTitle(handlers: TitleHandlers): TitleHandle {
   input.type = 'text';
   input.placeholder = 'try: 660 King St, San Francisco';
   input.setAttribute('aria-label', 'Bay Area address');
+  // Password managers see an "address" field and offer to fill it; these
+  // opt-outs cover 1Password, LastPass, and Bitwarden.
+  input.setAttribute('autocorrect', 'off');
+  input.setAttribute('autocapitalize', 'off');
+  input.spellcheck = false;
+  input.setAttribute('data-1p-ignore', '');
+  input.setAttribute('data-lpignore', 'true');
+  input.setAttribute('data-bwignore', '');
+  input.setAttribute('data-form-type', 'other');
   const submit = el('button') as HTMLButtonElement;
   submit.type = 'submit';
   submit.textContent = 'fly';

@@ -43,7 +43,9 @@ export function createKeyModal(handlers: KeyModalHandlers): KeyModalHandle {
       Dream mode is crisper down low.
     </p>
     <input type="text" placeholder="paste your Google Maps API key" spellcheck="false"
-           autocomplete="off" data-bfv-key-input />
+           autocomplete="off" autocorrect="off" autocapitalize="off"
+           data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other"
+           data-bfv-key-input />
     <div class="bfv-modal-actions">
       <button type="button" class="bfv-btn" data-bfv-key-cancel>use dream mode</button>
       <button type="button" class="bfv-btn bfv-btn-primary" data-bfv-key-save>save & switch</button>

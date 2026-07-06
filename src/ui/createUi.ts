@@ -81,6 +81,12 @@ export function createUi(opts: CreateUiOptions): UiApi {
   const closeTitle = (): void => {
     titleOpen = false;
     title.hide();
+    // Drop keyboard focus from whatever the title held (usually the search
+    // input). If it stays focused, macOS press-and-hold eats held keys
+    // (accent picker mid-flight) and the InputManager text-entry guard
+    // correctly mutes all flight controls.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
     if (flying) searchButton.setVisible(true);
   };
 
