@@ -21,8 +21,8 @@ import {
   PlaneGeometry, Raycaster, Vector3,
 } from 'three';
 import type { GeoPoint, GroundHit, WorldSource } from '../types';
-import { ATTRIBUTION_BASE, TERRAIN_ZOOM } from '../config';
-import { EnuFrame, geoToTile } from '../geo/mercator';
+import { ATTRIBUTION_BASE, TERRAIN_ZOOM, VECTOR_ZOOM } from '../config';
+import { EnuFrame, geoToTile, latToTileY, lonToTileX } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import { COLOR_WATER } from './palette';
 import { TileStreamer } from './tileStreamer';
@@ -165,6 +165,49 @@ export class StylizedWorld implements WorldSource {
 
     // Rebuild terrain meshes for any new terrain tile in view.
     this.rebuildTerrainRing(geo.lat, geo.lon);
+
+    // Distance-based LOD: hide the fat, subpixel-at-distance layers on
+    // faraway tiles. Trees + lane lines at MID, minor roads at FAR.
+    this.applyLod(geo.lat, geo.lon, cameraPos.y);
+  }
+
+  /**
+   * Toggle per-tile mesh visibility based on distance-from-camera in
+   * TILE units + a camera-altitude bump. Cheap (no rebuilds, no material
+   * work) — just walks the streamer's tile groups once per frame.
+   *
+   * Tiers, per tile:
+   *   0 = NEAR  (≤ 1.5 tile spans + camera under 400 m altitude)
+   *   1 = MID   (≤ 3.5 tile spans, OR bumped up by altitude)
+   *   2 = FAR   (beyond)
+   *
+   * Each mesh optionally has `userData.lodHideAt` — the tier value AT or
+   * ABOVE which it's hidden. Missing = never hidden.
+   */
+  private applyLod(cameraLat: number, cameraLon: number, cameraAltY: number): void {
+    const cx = Math.floor(lonToTileX(cameraLon, VECTOR_ZOOM));
+    const cy = Math.floor(latToTileY(cameraLat, VECTOR_ZOOM));
+    const altBump = cameraAltY > 400 ? 1 : 0;
+    for (const tileGroup of this.streamer.root.children) {
+      // Tile groups are named `tile TX/TY`. Extract to compute distance.
+      const nm = tileGroup.name;
+      if (!nm.startsWith('tile ')) continue;
+      const slash = nm.indexOf('/', 5);
+      if (slash < 0) continue;
+      const tx = +nm.slice(5, slash);
+      const ty = +nm.slice(slash + 1);
+      const d = Math.max(Math.abs(tx - cx), Math.abs(ty - cy));
+      // Two thresholds — 1.5 and 3.5 tile spans — then the altitude bump.
+      let tier = d <= 1 ? 0 : d <= 3 ? 1 : 2;
+      tier = Math.min(2, tier + altBump);
+      // tileGroup children are always a single wrapping `tile-content` Group.
+      for (const content of tileGroup.children) {
+        for (const mesh of content.children) {
+          const hideAt = (mesh.userData as { lodHideAt?: number }).lodHideAt;
+          mesh.visible = hideAt === undefined || tier < hideAt;
+        }
+      }
+    }
   }
 
   /**

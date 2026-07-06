@@ -94,6 +94,18 @@ export class TerrainSampler {
     return this.sampleTile(tile, px, py);
   }
 
+  /**
+   * Is the terrain tile covering this lat/lon FULLY decoded and available?
+   * Returns false when the tile hasn't been fetched yet OR is mid-flight.
+   * Callers baking tree Y positions use this so they don't stamp instances
+   * at Y = 0 across hillsides whose terrain hasn't loaded yet.
+   */
+  hasElevationAt(lat: number, lon: number): boolean {
+    const { x, y } = geoToTile(lat, lon, this.zoom);
+    const tile = this.tiles.get(key(x, y));
+    return !!(tile && tile.elev);
+  }
+
   /** Number of successfully loaded tiles — useful for demos/tests. */
   get loadedCount(): number {
     let n = 0;

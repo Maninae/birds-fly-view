@@ -1,8 +1,14 @@
 /**
  * Turn one decoded vector tile into a Group of meshes.
  *
- * Merges by surface type into a single geometry apiece so each tile
- * costs ~4-5 draw calls: buildings, roads, water, greens, trees.
+ * Each mesh gets a `userData.lodHideAt` tag so `StylizedWorld` can toggle
+ * visibility per tile at distance:
+ *   • 0 (or missing): never hidden — buildings, water, greens, major
+ *     roads, bridges. These carry the city read across all altitudes.
+ *   • 1: hidden at MID+ — lane lines, trees. Subpixel at bird height,
+ *     so we skip them once tiles fall away from the camera.
+ *   • 2: hidden at FAR — minor roads (residential/service/path/etc.),
+ *     which collapse into the noise of a fog-eaten neighborhood block.
  *
  * Wired up by `TileStreamer`; the materials are owned by `StylizedWorld`.
  */
@@ -94,12 +100,25 @@ export function buildTilePayload(
     }
   }
 
-  // Roads — flat ribbons draped on terrain.
+  // Roads — flat ribbons draped on terrain, split by LOD tier so distant
+  // tiles can drop lane lines + residential streets cheaply.
   if (transportation) {
-    const data = buildRoadBuffers(transportation, tx, ty, tz, frame, terrain);
-    if (data) {
-      const mesh = new Mesh(makeGeometry(data), mats.roadMat);
-      mesh.name = 'roads';
+    const road = buildRoadBuffers(transportation, tx, ty, tz, frame, terrain);
+    if (road?.major) {
+      const mesh = new Mesh(makeGeometry(road.major), mats.roadMat);
+      mesh.name = 'roads-major';
+      g.add(mesh);
+    }
+    if (road?.minor) {
+      const mesh = new Mesh(makeGeometry(road.minor), mats.roadMat);
+      mesh.name = 'roads-minor';
+      mesh.userData.lodHideAt = 2;
+      g.add(mesh);
+    }
+    if (road?.lanes) {
+      const mesh = new Mesh(makeGeometry(road.lanes), mats.roadMat);
+      mesh.name = 'roads-lanes';
+      mesh.userData.lodHideAt = 1;
       g.add(mesh);
     }
   }
@@ -117,9 +136,15 @@ export function buildTilePayload(
   }
 
   // Trees — sparse instances inside parks/wood polygons AND lining
-  // residential/minor streets (Bay Area is a tree-lined city).
+  // residential/minor streets (Bay Area is a tree-lined city). Trees
+  // hide at MID tier — the biggest triangle sink at distance.
   const trees = buildTreeInstances({ park, landcover, transportation }, tx, ty, tz, frame, terrain);
-  if (trees) { trees.name = 'trees'; g.add(trees); }
+  if (trees) {
+    for (const t of trees) {
+      t.userData.lodHideAt = 1;
+      g.add(t);
+    }
+  }
 
   return g.children.length ? g : null;
 }

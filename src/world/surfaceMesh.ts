@@ -36,6 +36,15 @@ const LANE_HALF_W: Record<string, number> = {
   motorway: 0.18, trunk: 0.16, primary: 0.14, secondary: 0.12,
 };
 
+/**
+ * Classes routed into the MAJOR mesh. Freeways/arterials + rail are always
+ * visible; the FAR-tier LOD suppresses only the MINOR mesh (residential
+ * streets and slivers below).
+ */
+const MAJOR_ROAD_CLASSES = new Set([
+  'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'rail',
+]);
+
 export interface BufferData {
   positions: Float32Array;
   normals: Float32Array;
@@ -50,16 +59,30 @@ export interface BufferData {
  * Skips tunnels; treats bridges as normal roads (v2 will lift them).
  * Y at each vertex is sampled from terrain so ribbons hug the hills.
  */
+/** Split road output for distance-tier LOD. Any field can be null. */
+export interface RoadBuffers {
+  /** Freeways/arterials/rail — always visible. */
+  major: BufferData | null;
+  /** Residential/service/path/track/etc. — hidden at FAR tier. */
+  minor: BufferData | null;
+  /** Cream lane markings — hidden at MID+ tier. */
+  lanes: BufferData | null;
+}
+
 export function buildRoadBuffers(
   layer: VectorTileLayer,
   tileX: number, tileY: number, tileZ: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
-): BufferData | null {
-  const rb = new RibbonBuilder();
+): RoadBuffers | null {
+  // Two mesh streams so LOD can hide MINOR at long distance without
+  // stripping the freeway grid — the arterials give you the city read
+  // even when everything else is culled.
+  const rbMajor = new RibbonBuilder();
+  const rbMinor = new RibbonBuilder();
   const color = new Color();
-  // Lane markings emit into a SECOND ribbon builder so we can drape them
-  // at their own slightly-higher Y without a redundant sample loop.
+  // Lane markings emit into a third builder so we can drape them at
+  // their own slightly-higher Y AND toggle them at MID tier.
   const laneRb = new RibbonBuilder();
   const laneColor = new Color();
 
@@ -79,6 +102,7 @@ export function buildRoadBuffers(
     color.copy(ROAD_COLORS[cls] ?? ROAD_COLORS.minor);
     const halfW = ROAD_HALF_WIDTHS[cls];
     const extent = feat.extent;
+    const rb = MAJOR_ROAD_CLASSES.has(cls) ? rbMajor : rbMinor;
 
     // loadGeometry() returns Point[][] — one polyline per ring.
     const rings = feat.loadGeometry();
@@ -109,23 +133,20 @@ export function buildRoadBuffers(
     }
   }
 
-  if (rb.vertexCount === 0) return null;
+  if (rbMajor.vertexCount === 0 && rbMinor.vertexCount === 0 && laneRb.vertexCount === 0) {
+    return null;
+  }
 
-  // Drape both ribbons on terrain, but at their own offsets.
-  drapeInPlace(rb.positions, frame, terrain, ROAD_DRAPE);
+  // Drape each ribbon at its own Y so we can share the road material.
+  if (rbMajor.vertexCount > 0) drapeInPlace(rbMajor.positions, frame, terrain, ROAD_DRAPE);
+  if (rbMinor.vertexCount > 0) drapeInPlace(rbMinor.positions, frame, terrain, ROAD_DRAPE);
   if (laneRb.vertexCount > 0) drapeInPlace(laneRb.positions, frame, terrain, LANE_DRAPE);
 
-  // Merge the two ribbon buffers into a single BufferData so roads stay
-  // one draw call per tile. Lane verts come after road verts; lane
-  // indices shift accordingly.
-  const roadVerts = rb.vertexCount;
-  const positions = [...rb.positions, ...laneRb.positions];
-  const colors = [...rb.colors, ...laneRb.colors];
-  const indices = [
-    ...rb.indices,
-    ...laneRb.indices.map((k) => k + roadVerts),
-  ];
-  return finalize(positions, colors, indices);
+  return {
+    major: rbMajor.vertexCount > 0 ? finalize(rbMajor.positions, rbMajor.colors, rbMajor.indices) : null,
+    minor: rbMinor.vertexCount > 0 ? finalize(rbMinor.positions, rbMinor.colors, rbMinor.indices) : null,
+    lanes: laneRb.vertexCount > 0 ? finalize(laneRb.positions, laneRb.colors, laneRb.indices) : null,
+  };
 }
 
 /**
