@@ -322,6 +322,34 @@ function clipSegment(
   };
 }
 
+/**
+ * Insert extra vertices along any segment longer than `maxLen` meters so a
+ * ribbon draped by per-vertex terrain sampling follows hilly terrain instead
+ * of chording under it. Preserves every input vertex; endpoints unchanged.
+ * No-op when the polyline has fewer than 2 points.
+ */
+export function subdividePolylineByMaxLen<T extends { x: number; z: number }>(
+  line: readonly T[],
+  maxLen: number,
+): { x: number; z: number }[] {
+  if (line.length < 2 || maxLen <= 0) return line.map((p) => ({ x: p.x, z: p.z }));
+  const out: { x: number; z: number }[] = [{ x: line[0].x, z: line[0].z }];
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const d = Math.hypot(dx, dz);
+    if (d > maxLen) {
+      const n = Math.ceil(d / maxLen);
+      for (let k = 1; k < n; k++) {
+        const t = k / n;
+        out.push({ x: a.x + dx * t, z: a.z + dz * t });
+      }
+    }
+    out.push({ x: b.x, z: b.z });
+  }
+  return out;
+}
+
 /** Point-in-polygon (even-odd rule) — treats holes correctly if you call twice. */
 export function pointInRing(x: number, z: number, ring: Vector2[]): boolean {
   let inside = false;

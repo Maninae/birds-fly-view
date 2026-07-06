@@ -22,7 +22,9 @@ import {
 } from 'three';
 import type { GeoPoint, GroundHit, WorldSource } from '../types';
 import { ATTRIBUTION_BASE, TERRAIN_ZOOM, VECTOR_ZOOM } from '../config';
-import { EnuFrame, geoToTile, latToTileY, lonToTileX } from '../geo/mercator';
+import {
+  EnuFrame, geoToTile, latToTileY, lonToTileX, tileXToLon, tileYToLat,
+} from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import { COLOR_WATER } from './palette';
 import { TileStreamer } from './tileStreamer';
@@ -116,14 +118,25 @@ export class StylizedWorld implements WorldSource {
     // tile builder an EdgeDedupe that writes to BOTH the global set
     // (so seams dedupe cleanly) AND a per-tile set the streamer
     // releases on eviction (so walls come back when neighbors reload).
-    this.streamer = new TileStreamer((tile, tx, ty, tz, frame, edges) =>
-      buildTilePayload(tile, tx, ty, tz, frame, this.terrain, {
-        buildingMat: this.buildingMat,
-        roadMat: this.roadMat,
-        waterMat: this.waterMat,
-        greenMat: this.greenMat,
-        bridgeMat: this.bridgeMat,
-      }, edges),
+    //
+    // Readiness gate: drape samples road/greens Y from terrain — if the
+    // z12 terrain tile hasn't decoded yet, `sample()` returns 0 and the
+    // drape bakes at Y=drape_offset (a few meters over the ocean plane).
+    // Hold vector tiles in 'building' state until their terrain lands.
+    this.streamer = new TileStreamer(
+      (tile, tx, ty, tz, frame, edges) =>
+        buildTilePayload(tile, tx, ty, tz, frame, this.terrain, {
+          buildingMat: this.buildingMat,
+          roadMat: this.roadMat,
+          waterMat: this.waterMat,
+          greenMat: this.greenMat,
+          bridgeMat: this.bridgeMat,
+        }, edges),
+      (tx, ty, tz) => {
+        const lat = 0.5 * (tileYToLat(ty, tz) + tileYToLat(ty + 1, tz));
+        const lon = 0.5 * (tileXToLon(tx, tz) + tileXToLon(tx + 1, tz));
+        return this.terrain.hasElevationAt(lat, lon);
+      },
     );
     this.root.add(this.streamer.root);
   }

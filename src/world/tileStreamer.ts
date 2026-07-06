@@ -44,6 +44,14 @@ export type TileBuilder = (
   edges: EdgeDedupe,
 ) => Object3D | null;
 
+/**
+ * Optional readiness gate for a wanted vector tile. Returns true when
+ * external state the builder depends on (terrain elevation, in practice)
+ * is present, so drape samples don't bake in as Y=0 before the ground
+ * mesh has anything to sit on.
+ */
+export type TileReadyGate = (tx: number, ty: number, tz: number) => boolean;
+
 interface TileEntry {
   tx: number;
   ty: number;
@@ -53,6 +61,8 @@ interface TileEntry {
   tilePromise?: Promise<VectorTile | null>;
   /** Wall-edge dedupe keys this tile added — released on evict. */
   wallEdges?: Set<string>;
+  /** Decoded vector tile held while waiting for the ready gate. */
+  pendingTile?: VectorTile;
 }
 
 export class TileStreamer {
@@ -77,10 +87,13 @@ export class TileStreamer {
    */
   private globalEdges = new Set<string>();
 
-  constructor(builder: TileBuilder) {
+  private readyGate?: TileReadyGate;
+
+  constructor(builder: TileBuilder, readyGate?: TileReadyGate) {
     this.root = new Group();
     this.root.name = 'stylized-vector-tiles';
     this.builder = builder;
+    this.readyGate = readyGate;
   }
 
   setFrame(frame: EnuFrame): void { this.frame = frame; }
@@ -118,6 +131,12 @@ export class TileStreamer {
         }
       }
     }
+
+    // Promote any tiles whose readiness gate now passes back into the
+    // build queue. This is the terrain-race safety net: a vector tile
+    // that decoded before its z12 terrain arrived is held in 'building'
+    // state so its drape samples aren't baked with terrain.sample()==0.
+    if (this.readyGate) this.promoteReadyDeferrals();
 
     // Drain build queue with a wall-clock budget.
     const t0 = performance.now();
@@ -203,6 +222,12 @@ export class TileStreamer {
   }
 
   private enqueueBuild(entry: TileEntry, tile: VectorTile): void {
+    // If the readiness gate blocks now, hold the decoded tile in the entry
+    // and let `promoteReadyDeferrals` re-enqueue it once the gate passes.
+    if (this.readyGate && !this.readyGate(entry.tx, entry.ty, this.tz)) {
+      entry.pendingTile = tile;
+      return;
+    }
     this.buildQueue.push(async () => {
       if (this.disposed || !this.frame) return;
       try {
@@ -223,6 +248,19 @@ export class TileStreamer {
         entry.state = 'failed';
       }
     });
+  }
+
+  /** Promote any deferred tiles whose readiness gate now passes. */
+  private promoteReadyDeferrals(): void {
+    if (!this.readyGate) return;
+    for (const entry of this.tiles.values()) {
+      if (entry.state !== 'building' || !entry.pendingTile) continue;
+      if (this.readyGate(entry.tx, entry.ty, this.tz)) {
+        const tile = entry.pendingTile;
+        entry.pendingTile = undefined;
+        this.enqueueBuild(entry, tile);
+      }
+    }
   }
 
   private evictTile(k: string, entry: TileEntry): void {

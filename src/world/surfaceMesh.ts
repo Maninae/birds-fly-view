@@ -10,7 +10,7 @@ import { EnuFrame, projectTileRingToEnu2 } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import {
   extractPolygons, appendPolygonFlat, clipPolylineToTileBox,
-  featureAnchorInTile, ringCentroid,
+  featureAnchorInTile, ringCentroid, subdividePolylineByMaxLen,
 } from './geometryUtils';
 import {
   RibbonBuilder, ROAD_HALF_WIDTHS, DRAWABLE_CLASSES,
@@ -22,12 +22,24 @@ import {
   LANDUSE_INDUSTRIAL, LANDUSE_SCHOOL, LANDUSE_HOSPITAL, LANDUSE_CEMETERY,
 } from './palette';
 
-// Small vertical offsets prevent z-fighting between draped layers.
-const ROAD_DRAPE = 0.4;      // over terrain
-const LANE_DRAPE = 0.43;     // ~3 cm above the road so lines aren't buried
+// Vertical offsets over the terrain MESH surface. Draped surfaces sample
+// `terrain.sampleMeshY` (not the finer raster), so these offsets are the
+// literal clearance between the drawn surface and the rendered ground.
+const ROAD_DRAPE = 0.6;      // over the terrain mesh
+const LANE_DRAPE = 0.63;     // ~3 cm above the road so lines aren't buried
 const WATER_Y = 0.5;         // sea level, near y=0 ocean plane
 const GREEN_DRAPE = 0.15;    // slightly above terrain, under roads
 const LANDUSE_DRAPE = 0.12;  // just below greens so parks paint on top
+
+/**
+ * Max distance (m) between two ribbon vertices. OSM ways sample sparsely
+ * (100-500 m between vertices on a straight freeway), and the ribbon
+ * chords in a straight line between vertices — on a hill, that chord
+ * dives under the terrain in between. Subdivide so each ribbon segment
+ * fits inside roughly one terrain-mesh cell (~118 m at z12), then per-vertex
+ * mesh drape hugs the ground.
+ */
+const MAX_ROAD_SEGMENT_M = 30;
 
 /**
  * Threshold for suppressing landcover/park polygons that shelve out
@@ -122,9 +134,12 @@ export function buildRoadBuffers(
       // box; adjacent tiles pick up their side at the shared boundary.
       const subLines = clipPolylineToTileBox(ring, extent);
       for (const sub of subLines) {
-        const line: { x: number; z: number }[] = projectTileRingToEnu2(
+        const projected = projectTileRingToEnu2(
           sub, tileX, tileY, tileZ, extent, frame,
         ).map((v) => ({ x: v.x, z: v.y }));
+        // Insert intermediate vertices so a long OSM segment on a hillside
+        // stops chording under the terrain mesh between its endpoints.
+        const line = subdividePolylineByMaxLen(projected, MAX_ROAD_SEGMENT_M);
         rb.addPolyline(line, halfW, color, ROAD_DRAPE);
 
         // Painted lane markings for freeways + arterials. Centerline is
@@ -255,7 +270,7 @@ export function buildGreenBuffers(
       // Draping Y at centroid — polygon is small enough to look flat.
       const c = ringCentroid(poly.outer);
       const geo = frame.enuToGeo(c.x, c.z);
-      const groundY = terrain.sample(geo.lat, geo.lon);
+      const groundY = terrain.sampleMeshY(geo.lat, geo.lon);
       appendPolygonFlat(poly, groundY + GREEN_DRAPE, color, positions, normals, colors, indices);
       hit++;
     }
@@ -306,7 +321,7 @@ export function buildGreenBuffers(
       if (touchesWater(poly, frame, terrain)) continue;
       const c = ringCentroid(poly.outer);
       const geo = frame.enuToGeo(c.x, c.z);
-      const y = terrain.sample(geo.lat, geo.lon) + offset;
+      const y = terrain.sampleMeshY(geo.lat, geo.lon) + offset;
       appendPolygonFlat(poly, y, color, positions, normals, colors, indices);
       hit++;
     }
@@ -378,7 +393,10 @@ function drapeInPlace(
   for (let i = 0; i < posArr.length; i += 3) {
     const x = posArr[i], z = posArr[i + 2];
     const geo = frame.enuToGeo(x, z);
-    posArr[i + 1] = terrain.sample(geo.lat, geo.lon) + offset;
+    // sampleMeshY (not sample) so ribbons ride on the terrain-mesh surface
+    // — the finer Terrarium raster can lie below the mesh's linear
+    // interpolation on hillside cells, burying draped roads.
+    posArr[i + 1] = terrain.sampleMeshY(geo.lat, geo.lon) + offset;
   }
 }
 

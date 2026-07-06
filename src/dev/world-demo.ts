@@ -141,6 +141,29 @@ export async function runWorldDemo(opts: DemoOptions = {}): Promise<{
   }
   requestAnimationFrame(tick);
 
+  // Playwright hooks — dev-only surface for placing the camera in fixed
+  // spots so a screenshot script can verify visual invariants.
+  interface DemoWindow extends Window {
+    __worldDemoCamera?: PerspectiveCamera;
+    __worldDemoSetCam?: (
+      x: number, y: number, z: number, tx: number, ty: number, tz: number,
+    ) => void;
+    __worldDemoReady?: boolean;
+  }
+  const w = window as unknown as DemoWindow;
+  w.__worldDemoCamera = camera;
+  w.__worldDemoSetCam = (x, y, z, tx, ty, tz) => {
+    camera.position.set(x, y, z);
+    camera.lookAt(tx, ty, tz);
+    // Sync WASD yaw/pitch to the new look direction so mouse-look picks up
+    // from the same orientation the caller placed.
+    const dx = tx - x, dy = ty - y, dz = tz - z;
+    const len = Math.hypot(dx, dz) || 1;
+    yaw = Math.atan2(dx, -dz);
+    pitch = Math.atan2(dy, len);
+  };
+  w.__worldDemoReady = true;
+
   return {
     world, camera, renderer,
     stop() { running = false; world.dispose(); renderer.dispose(); },

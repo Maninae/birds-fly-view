@@ -12,11 +12,15 @@ import {
   BufferGeometry, BufferAttribute, Color, Material, Mesh,
 } from 'three';
 import { EnuFrame, tileXToLon, tileYToLat } from '../geo/mercator';
-import { TerrainSampler } from '../geo/terrain';
+import { TerrainSampler, TERRAIN_MESH_GRID } from '../geo/terrain';
 import { terrainColorAt } from './palette';
 
-/** Grid resolution per z12 terrain tile. 64 → 3969 verts, 7938 tris — cheap. */
-const GRID = 64;
+/**
+ * Grid resolution per z12 terrain tile — GRID+1 samples per side. Shared with
+ * `TerrainSampler.sampleMeshY` so drape samplers agree on the rendered surface;
+ * see the constant's definition in `../geo/terrain.ts` for the invariant.
+ */
+const GRID = TERRAIN_MESH_GRID;
 
 /**
  * Build a terrain-tile mesh spanning the z12 tile at (`tx`, `ty`).

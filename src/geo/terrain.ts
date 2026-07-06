@@ -17,6 +17,14 @@ import {
 const TILE_SIZE = 256;
 const MAX_TILES = 40;             // LRU cap — ~40 × 256² floats ≈ 10 MB
 
+/**
+ * Subdivisions per Terrarium tile side used by the terrain MESH generator.
+ * Kept here so both the mesh and any drape sampler agree on the effective
+ * ground surface: draped ribbons/polygons that use `sampleMeshY` sit exactly
+ * on top of the rendered mesh with no interpolation mismatch on hillsides.
+ */
+export const TERRAIN_MESH_GRID = 64;
+
 interface TerrainTile {
   z: number;
   x: number;
@@ -78,6 +86,50 @@ export class TerrainSampler {
       }
     }
     return Promise.all(promises).then(() => undefined);
+  }
+
+  /**
+   * Sample the elevation the terrain MESH renders at (lat, lon).
+   *
+   * The mesh is a `TERRAIN_MESH_GRID`-subdivided heightfield per z12 tile;
+   * each mesh vertex uses `sample()` at its own (lat, lon), and the mesh
+   * renders linear interpolation between vertices. Draped surfaces
+   * (roads, greens, landuse) using this value therefore sit ON the
+   * rendered mesh — not on the finer Terrarium raster, which can lie
+   * BELOW the mesh's linear interpolation on hillside cells and cause
+   * roads to bury into the ground.
+   *
+   * Returns 0 when the covering z12 tile is not loaded.
+   */
+  sampleMeshY(lat: number, lon: number): number {
+    const zoom = this.zoom;
+    const fxTile = lonToTileX(lon, zoom);
+    const fyTile = latToTileY(lat, zoom);
+    const tx = Math.floor(fxTile);
+    const ty = Math.floor(fyTile);
+    // Mesh vertex spacing matches terrainMesh.ts: linear over the tile's
+    // west/east lon range and north/south lat range.
+    const west = tileXToLon(tx, zoom);
+    const east = tileXToLon(tx + 1, zoom);
+    const north = tileYToLat(ty, zoom);
+    const south = tileYToLat(ty + 1, zoom);
+    const gridX = TERRAIN_MESH_GRID * (lon - west) / (east - west);
+    const gridY = TERRAIN_MESH_GRID * (lat - north) / (south - north);
+    const ix = Math.max(0, Math.min(TERRAIN_MESH_GRID - 1, Math.floor(gridX)));
+    const iy = Math.max(0, Math.min(TERRAIN_MESH_GRID - 1, Math.floor(gridY)));
+    const fx = Math.max(0, Math.min(1, gridX - ix));
+    const fy = Math.max(0, Math.min(1, gridY - iy));
+    const lon0 = west + (east - west) * (ix / TERRAIN_MESH_GRID);
+    const lon1 = west + (east - west) * ((ix + 1) / TERRAIN_MESH_GRID);
+    const lat0 = north + (south - north) * (iy / TERRAIN_MESH_GRID);
+    const lat1 = north + (south - north) * ((iy + 1) / TERRAIN_MESH_GRID);
+    const e00 = this.sample(lat0, lon0);
+    const e10 = this.sample(lat0, lon1);
+    const e01 = this.sample(lat1, lon0);
+    const e11 = this.sample(lat1, lon1);
+    const e0 = e00 * (1 - fx) + e10 * fx;
+    const e1 = e01 * (1 - fx) + e11 * fx;
+    return e0 * (1 - fy) + e1 * fy;
   }
 
   /** Sample elevation (meters) at a geographic point, bilinear. Returns 0 on miss. */
