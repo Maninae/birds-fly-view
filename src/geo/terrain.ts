@@ -127,9 +127,14 @@ export class TerrainSampler {
     const e10 = this.sample(lat0, lon1);
     const e01 = this.sample(lat1, lon0);
     const e11 = this.sample(lat1, lon1);
-    const e0 = e00 * (1 - fx) + e10 * fx;
-    const e1 = e01 * (1 - fx) + e11 * fx;
-    return e0 * (1 - fy) + e1 * fy;
+    // Match the mesh's triangulation exactly, not bilinear: terrainMesh.ts
+    // splits each cell into (a,c,b)+(b,c,d), i.e. along the fx+fy=1 diagonal.
+    // On saddle cells bilinear diverges from the rendered triangles by up to
+    // |e00+e11-e10-e01|/4 at the center, enough to re-bury draped roads.
+    if (fx + fy <= 1) {
+      return e00 + (e10 - e00) * fx + (e01 - e00) * fy;
+    }
+    return e11 + (e01 - e11) * (1 - fx) + (e10 - e11) * (1 - fy);
   }
 
   /** Sample elevation (meters) at a geographic point, bilinear. Returns 0 on miss. */

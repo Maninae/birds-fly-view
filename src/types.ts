@@ -119,7 +119,8 @@ export interface UiApi {
   /**
    * Push the current geographic position + compass heading to the corner
    * minimap. Optional so demos/tests that omit the minimap still satisfy the
-   * contract. Callers throttle to keep DOM writes off the hot path.
+   * contract. Called every frame: implementations must be cheap and
+   * allocation-free (the shipped minimap blits one cached sprite).
    */
   updateMap?(lon: number, lat: number, headingDeg: number): void;
 }

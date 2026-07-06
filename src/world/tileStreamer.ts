@@ -65,6 +65,19 @@ interface TileEntry {
   pendingTile?: VectorTile;
 }
 
+/**
+ * Safe to dispose right now: fully built, permanently failed, or parked
+ * behind the ready gate. NOT 'fetching' or an in-queue build, whose async
+ * completions still write into the entry.
+ */
+function isEvictable(entry: TileEntry): boolean {
+  return (
+    entry.state === 'ready' ||
+    entry.state === 'failed' ||
+    (entry.state === 'building' && entry.pendingTile !== undefined)
+  );
+}
+
 export class TileStreamer {
   readonly root: Group;
   private tiles = new Map<string, TileEntry>();
@@ -156,11 +169,15 @@ export class TileStreamer {
       if (entry) this.startFetch(entry);
     }
 
-    // Evict tiles outside the (radius + margin) box.
+    // Evict tiles outside the (radius + margin) box. Besides 'ready' tiles,
+    // this covers gate-deferred tiles (their stashed VectorTile would leak
+    // forever if the covering terrain fetch failed) and 'failed' tiles (so
+    // re-entering the area retries the fetch). Actively fetching/queued
+    // builds are left alone: their async completions still write to the entry.
     const outerR = RING_RADIUS + EVICT_MARGIN;
     for (const [k, entry] of this.tiles) {
       const outside = Math.abs(entry.tx - cx) > outerR || Math.abs(entry.ty - cy) > outerR;
-      if (outside && entry.state === 'ready') {
+      if (outside && isEvictable(entry)) {
         this.evictTile(k, entry);
       }
     }
@@ -270,6 +287,7 @@ export class TileStreamer {
     if (entry.wallEdges) {
       for (const key of entry.wallEdges) this.globalEdges.delete(key);
     }
+    entry.pendingTile = undefined;
     this.disposeSubtree(entry.root);
     this.root.remove(entry.root);
     this.tiles.delete(k);
@@ -277,7 +295,7 @@ export class TileStreamer {
 
   private enforceCap(): void {
     const ready = [...this.tiles.entries()]
-      .filter(([, e]) => e.state === 'ready')
+      .filter(([, e]) => isEvictable(e))
       .sort((a, b) => a[1].lastSeen - b[1].lastSeen);
     let drop = this.tiles.size - MAX_TILES;
     for (const [k, entry] of ready) {

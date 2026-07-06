@@ -44,7 +44,6 @@ import {
   LAND_ARC_LIFT,
   LAND_EASE_SEC,
   LAND_FLARE_PITCH,
-  LAND_HEIGHT,
 } from './tuning.js';
 import { newWalkMemory, stepWalk } from './walk.js';
 import type { WalkMemory } from './walk.js';
@@ -334,7 +333,10 @@ export class BirdSystem implements BirdSystemApi {
   private beginTakeoff(world: WorldSource): void {
     // Reset flight memory and pop up ABOVE the landing-detection window so
     // the very-next flight tick doesn't spuriously re-detect a candidate.
-    this.pose.position.y += LAND_HEIGHT * 1.2;
+    // Per-craft: the biplane's landing window (32 m) is taller than the
+    // bird's, so the pop must scale with the active tuning or the landing
+    // prompt re-appears the frame after takeoff.
+    this.pose.position.y += this.tuning.LAND_HEIGHT * 1.2;
     // If the takeoff pop somehow puts the bird into a hillside (steep terrain
     // + generous pop), the shared floor guarantee fires and lifts us clear.
     enforceGroundFloor(this.pose, this.col, world, 0.05);
