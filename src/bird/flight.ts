@@ -19,35 +19,22 @@ import { Vector3 } from 'three';
 import type { BirdPose, GroundHit, InputState, WorldSource } from '../types.js';
 import type { CollisionMemory, WallSlideResult } from './collision.js';
 import { enforceGroundFloor, wallLookahead, wallSlide } from './collision.js';
+import type { CraftTuning } from './craftTuning.js';
 import {
   AUTOLEVEL_PITCH,
   AUTOLEVEL_ROLL,
   BANK_RATE,
-  BRAKE_DECEL,
-  BRAKE_EXTRA_SINK,
   BRAKE_LOW_ALT_MULTIPLIER,
   BRAKE_LOW_ALT_THRESHOLD,
   CLIMB_BLEED,
-  CRUISE_SPEED,
   DIVE_ACCEL,
-  FLAP_BEATS_PER_SEC,
-  FLAP_FWD_IMPULSE,
-  FLAP_LIFT_IMPULSE,
-  FLAP_TAP_LIFT,
   FLARE_ALTITUDE,
   FLARE_PITCH,
   GRAVITY,
-  LAND_HEIGHT,
-  LAND_MAX_SPEED,
   LEVEL_SINK_RATE,
-  MAX_AIRSPEED,
-  MAX_BANK,
   MAX_PITCH,
-  MAX_STEP_M,
-  MIN_AIRSPEED,
   PITCH_RATE,
   SPEED_RESTORE,
-  YAW_AT_MAX_BANK,
 } from './tuning.js';
 
 /** Result of a flight step. `landing` = surface eligible for touchdown, else null. */
@@ -74,8 +61,9 @@ const _slide: WallSlideResult = { hit: false, velX: 0, velZ: 0 };
 
 /**
  * Advance the pose one step. Mutates `pose` in place. Substeps if the naive
- * displacement would exceed MAX_STEP_M — even at 45 m/s max dive, that keeps
- * per-substep travel small enough that the wall probes catch every facade.
+ * displacement would exceed `tuning.MAX_STEP_M` — keeps per-substep travel
+ * small enough that the wall probes catch every facade, even at the biplane's
+ * ~95 m/s dive.
  */
 export function stepFlight(
   pose: BirdPose,
@@ -83,15 +71,16 @@ export function stepFlight(
   col: CollisionMemory,
   input: InputState,
   world: WorldSource,
+  tuning: CraftTuning,
   dt: number,
 ): FlightStepResult {
   const displacement = pose.speed * dt;
-  const substeps = Math.max(1, Math.ceil(displacement / MAX_STEP_M));
+  const substeps = Math.max(1, Math.ceil(displacement / tuning.MAX_STEP_M));
   const stepDt = dt / substeps;
 
   let result: FlightStepResult = { landing: null, slidingOnWall: false };
   for (let i = 0; i < substeps; i++) {
-    result = advance(pose, mem, col, input, world, stepDt);
+    result = advance(pose, mem, col, input, world, tuning, stepDt);
   }
   return result;
 }
@@ -102,11 +91,12 @@ function advance(
   col: CollisionMemory,
   input: InputState,
   world: WorldSource,
+  tuning: CraftTuning,
   dt: number,
 ): FlightStepResult {
   // --- steering: target bank/pitch from key axes only ----------------------
   // (Mouse input is deliberately ignored; the bird never follows the mouse.)
-  const bankTarget = clamp(input.turn * MAX_BANK, -MAX_BANK, MAX_BANK);
+  const bankTarget = clamp(input.turn * tuning.MAX_BANK, -tuning.MAX_BANK, tuning.MAX_BANK);
   let pitchTarget = clamp(input.pitchAxis * MAX_PITCH, -MAX_PITCH, MAX_PITCH);
 
   // --- auto-flare when low --------------------------------------------------
@@ -120,7 +110,7 @@ function advance(
 
   // "Pulling back" now reads off pitchAxis (S/↓ → +ve = nose up). Brake still
   // suppresses flare — brake+descend should stay level, not shuttlecock.
-  const wantsToLand = input.pitchAxis > 0.1 && pose.speed < LAND_MAX_SPEED;
+  const wantsToLand = input.pitchAxis > 0.1 && pose.speed < tuning.LAND_MAX_SPEED;
   if (altitude < FLARE_ALTITUDE && !wantsToLand && !input.brake) {
     const t = 1 - altitude / FLARE_ALTITUDE;
     pitchTarget = Math.max(pitchTarget, FLARE_PITCH * t);
@@ -145,10 +135,11 @@ function advance(
     pose.pitch = approach(pose.pitch, 0, AUTOLEVEL_PITCH * dt);
   }
   pose.pitch = clamp(pose.pitch, -MAX_PITCH, MAX_PITCH);
-  pose.roll = clamp(pose.roll, -MAX_BANK, MAX_BANK);
+  pose.roll = clamp(pose.roll, -tuning.MAX_BANK, tuning.MAX_BANK);
 
   // Coordinated turn: yaw rate scales with sin(bank).
-  const yawRate = YAW_AT_MAX_BANK * (Math.sin(pose.roll) / Math.sin(MAX_BANK));
+  const yawRate =
+    tuning.YAW_AT_MAX_BANK * (Math.sin(pose.roll) / Math.sin(tuning.MAX_BANK));
   pose.yaw = wrapAngle(pose.yaw + yawRate * dt);
 
   // --- speed integration --------------------------------------------------
@@ -158,29 +149,31 @@ function advance(
   // Extra bleed when climbing (rough drag on lift-generation).
   if (sinP > 0) dv -= sinP * CLIMB_BLEED * GRAVITY * 0.15;
   // Restore toward cruise.
-  dv += (CRUISE_SPEED - pose.speed) * SPEED_RESTORE * 0.5;
+  dv += (tuning.CRUISE_SPEED - pose.speed) * SPEED_RESTORE * 0.5;
   // Below BRAKE_LOW_ALT_THRESHOLD the airbrake bites harder on both axes
   // — the player is committing to land and needs speed AND altitude to
   // actually come down. Used again below for the sink term.
   const brakeBoost = input.brake && altitude < BRAKE_LOW_ALT_THRESHOLD
     ? BRAKE_LOW_ALT_MULTIPLIER : 1;
   if (input.brake) {
-    dv -= BRAKE_DECEL * brakeBoost;
+    dv -= tuning.BRAKE_DECEL * brakeBoost;
   }
-  pose.speed = clamp(pose.speed + dv * dt, MIN_AIRSPEED, MAX_AIRSPEED);
+  pose.speed = clamp(pose.speed + dv * dt, tuning.MIN_AIRSPEED, tuning.MAX_AIRSPEED);
 
-  // --- flap impulses ------------------------------------------------------
+  // --- flap / throttle impulses --------------------------------------------
+  // On the bird these are wing beats (vertical lift + tiny forward nudge).
+  // On the biplane they are a throttle burst (forward-only, zero lift).
   mem.timeSinceBeat += dt;
-  const beatPeriod = 1 / FLAP_BEATS_PER_SEC;
+  const beatPeriod = 1 / tuning.FLAP_BEATS_PER_SEC;
   if (input.flap) {
-    mem.vy += FLAP_TAP_LIFT;
-    pose.speed = Math.min(MAX_AIRSPEED, pose.speed + FLAP_FWD_IMPULSE * 0.6);
+    mem.vy += tuning.FLAP_TAP_LIFT;
+    pose.speed = Math.min(tuning.MAX_AIRSPEED, pose.speed + tuning.FLAP_FWD_IMPULSE * 0.6);
     mem.timeSinceBeat = 0;
   }
   if (input.flapHold && mem.timeSinceBeat >= beatPeriod) {
     mem.timeSinceBeat = 0;
-    mem.vy += FLAP_LIFT_IMPULSE;
-    pose.speed = Math.min(MAX_AIRSPEED, pose.speed + FLAP_FWD_IMPULSE);
+    mem.vy += tuning.FLAP_LIFT_IMPULSE;
+    pose.speed = Math.min(tuning.MAX_AIRSPEED, pose.speed + tuning.FLAP_FWD_IMPULSE);
   }
 
   // --- move ----------------------------------------------------------------
@@ -202,7 +195,7 @@ function advance(
   // LEVEL_SINK_RATE = 0 by owner directive — hands-off level flight holds
   // altitude forever, so the bird never "falls" without an input.
   let dy = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
-  if (input.brake) dy -= BRAKE_EXTRA_SINK * brakeBoost;
+  if (input.brake) dy -= tuning.BRAKE_EXTRA_SINK * brakeBoost;
   dy *= dt;
 
   // Decay flap-lift memory back to zero.
@@ -220,17 +213,17 @@ function advance(
   // --- flap phase animation ----------------------------------------------
   // Smoothly progress flapPhase 0..1. Beats accelerate the phase when active.
   const beatSpeed = input.flapHold || input.flap
-    ? FLAP_BEATS_PER_SEC
-    : FLAP_BEATS_PER_SEC * 0.15; // slow glide idle
+    ? tuning.FLAP_BEATS_PER_SEC
+    : tuning.FLAP_BEATS_PER_SEC * 0.15; // slow glide idle
   pose.flapPhase = (pose.flapPhase + beatSpeed * dt) % 1;
 
   // --- landing candidate --------------------------------------------------
   let landing: GroundHit | null = null;
   if (
-    pose.speed < LAND_MAX_SPEED &&
+    pose.speed < tuning.LAND_MAX_SPEED &&
     belowHit &&
     belowHit.point.y > -100 &&
-    pose.position.y - belowHit.point.y < LAND_HEIGHT
+    pose.position.y - belowHit.point.y < tuning.LAND_HEIGHT
   ) {
     landing = belowHit;
   }

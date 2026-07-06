@@ -4,7 +4,9 @@
  * lectured on take-off.
  */
 
-const SEEN_KEY = 'bfv.controlsHintSeen';
+// Bumped from `bfv.controlsHintSeen` when the C-key craft toggle was added,
+// so returning players see the updated hint at least once.
+const SEEN_KEY = 'bfv.controlsHintSeenV2';
 const FADE_MS = 8000;
 
 export interface ControlsHintHandle {
@@ -20,7 +22,7 @@ export function createControlsHint(): ControlsHintHandle {
   root.innerHTML = `
     <div><kbd>A</kbd><kbd>D</kbd> turn · <kbd>W</kbd><kbd>S</kbd> dive/climb</div>
     <div><kbd>space</kbd> flaps · <kbd>shift</kbd> brakes</div>
-    <div><kbd>E</kbd> lands · <kbd>V</kbd> camera</div>
+    <div><kbd>E</kbd> lands · <kbd>V</kbd> camera · <kbd>C</kbd> bird/biplane</div>
   `;
 
   let timer: number | null = null;

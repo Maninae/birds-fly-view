@@ -4,7 +4,7 @@
  * exactly as they will with the real BirdSystem — no user input needed.
  */
 import { Group, Mesh, MeshLambertMaterial, PerspectiveCamera, SphereGeometry, Vector3 } from 'three';
-import type { AppMode, BirdPose, BirdSystemApi, GroundHit, WorldSource } from '../types';
+import type { AppMode, BirdPose, BirdSystemApi, CraftKind, GroundHit, WorldSource } from '../types';
 
 export class FakeBird implements BirdSystemApi {
   readonly object = new Group();
@@ -12,6 +12,7 @@ export class FakeBird implements BirdSystemApi {
   private readonly _pose: BirdPose;
   private t = 0;
   private landingCache: GroundHit | null = null;
+  private _craft: CraftKind = 'bird';
 
   constructor(aspect: number) {
     this.camera = new PerspectiveCamera(60, aspect, 0.5, 12000);
@@ -41,6 +42,14 @@ export class FakeBird implements BirdSystemApi {
 
   get landingCandidate(): GroundHit | null {
     return this.landingCache;
+  }
+
+  get craft(): CraftKind {
+    return this._craft;
+  }
+
+  setCraft(craft: CraftKind): void {
+    this._craft = craft;
   }
 
   placeAt(position: Vector3, headingRad: number): void {

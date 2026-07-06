@@ -43,16 +43,29 @@ function hasSetCamera(w: WorldSource): w is WorldSource & {
 }
 
 /**
+ * `input` handle returned by the factory. Exposes an optional `onCraftToggle`
+ * callback slot; App assigns it to `bird.setCraft(...)` so a single key (C)
+ * swaps the active craft without breaching the locked `InputState` contract.
+ */
+export interface AppInputHandle {
+  readonly state: InputState;
+  endFrame(): void;
+  dispose(): void;
+  onCraftToggle?: (() => void) | null;
+}
+
+/**
  * Factory bundle — the only surface an integrator needs to swap for tests
  * or the dev harness. In prod, `world` is `new StylizedWorld()`, `bird` is
  * `new BirdSystem(aspect)`, `input` is `new InputManager(target)`, and
  * `photoWorld` dynamic-imports PhotoWorld on demand.
  */
+
 export interface AppFactories {
   world: () => WorldSource;
   photoWorld?: (apiKey: string) => Promise<WorldSource>;
   bird: (aspect: number) => BirdSystemApi;
-  input: (target: HTMLElement) => { readonly state: InputState; endFrame(): void; dispose(): void };
+  input: (target: HTMLElement) => AppInputHandle;
 }
 
 /** Production factories — wires up the sibling modules by their canonical names. */
@@ -192,7 +205,21 @@ export class App {
     const headingRad = ((headingDeg ?? 0) * Math.PI) / 180;
     this.bird.placeAt(spawn, headingRad);
 
-    if (!this.input) this.input = this.factories.input(this.canvas);
+    if (!this.input) {
+      this.input = this.factories.input(this.canvas);
+      // C key swaps craft. Wired here (not inside InputManager) so the toggle
+      // knows which bird instance to talk to. Gated on world present + flying:
+      // the DOM handler fires outside the frame loop and can arrive mid title-
+      // veil or between switcher.switchKind boundaries; BirdSystem defers the
+      // actual swap to update() and only applies when easeT === 0.
+      if ('onCraftToggle' in this.input) {
+        this.input.onCraftToggle = () => {
+          if (!this.bird || !this.flying || !this.switcher.current) return;
+          const next = this.bird.craft === 'bird' ? 'biplane' : 'bird';
+          this.bird.setCraft(next);
+        };
+      }
+    }
 
     this.lastLabel = label;
     this.flying = true;

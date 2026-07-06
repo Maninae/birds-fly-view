@@ -10,7 +10,8 @@ import {
   headingVector,
   wrapAngle,
 } from '../src/bird/flight';
-import { projectVelocity } from '../src/bird/collision';
+import { projectVelocity, wallLookahead } from '../src/bird/collision';
+import { BIPLANE_TUNING, BIRD_TUNING } from '../src/bird/craftTuning';
 
 describe('headingVector', () => {
   it('yaw = 0 points −Z (north)', () => {
@@ -81,6 +82,60 @@ describe('projectVelocity (wall slide)', () => {
     const r = projectVelocity(1, 0, -s, -s);
     expect(r.x).toBeCloseTo(0.5, 6);
     expect(r.z).toBeCloseTo(-0.5, 6);
+  });
+});
+
+describe('craft substep tunneling invariant', () => {
+  // BirdSystem.update clamps dt to 0.1 s; the worst per-frame displacement is
+  // therefore MAX_AIRSPEED * 0.1. Substepping enforces per-substep travel <=
+  // MAX_STEP_M; the wall probe reaches MAX_STEP_M + WALL_SAFETY_MARGIN. Together
+  // that means no wall can slip between two consecutive substep probes.
+  const MAX_DT = 0.1;
+
+  function perSubstepTravel(maxSpeed: number, maxStep: number, dt: number): number {
+    const displacement = maxSpeed * dt;
+    const substeps = Math.max(1, Math.ceil(displacement / maxStep));
+    return maxSpeed * (dt / substeps);
+  }
+
+  it('bird per-substep travel stays inside the wall probe reach', () => {
+    const dt = MAX_DT;
+    const travel = perSubstepTravel(BIRD_TUNING.MAX_AIRSPEED, BIRD_TUNING.MAX_STEP_M, dt);
+    const stepDt = dt / Math.max(
+      1,
+      Math.ceil((BIRD_TUNING.MAX_AIRSPEED * dt) / BIRD_TUNING.MAX_STEP_M),
+    );
+    const probe = wallLookahead(BIRD_TUNING.MAX_AIRSPEED, stepDt);
+    expect(travel).toBeLessThanOrEqual(BIRD_TUNING.MAX_STEP_M + 1e-9);
+    expect(travel).toBeLessThanOrEqual(probe);
+  });
+
+  it('biplane per-substep travel stays inside the wall probe reach', () => {
+    const dt = MAX_DT;
+    const travel = perSubstepTravel(BIPLANE_TUNING.MAX_AIRSPEED, BIPLANE_TUNING.MAX_STEP_M, dt);
+    const stepDt = dt / Math.max(
+      1,
+      Math.ceil((BIPLANE_TUNING.MAX_AIRSPEED * dt) / BIPLANE_TUNING.MAX_STEP_M),
+    );
+    const probe = wallLookahead(BIPLANE_TUNING.MAX_AIRSPEED, stepDt);
+    // Tightest invariant: per-substep travel <= MAX_STEP_M (contract of the
+    // substepper). Sanity: also <= probe reach so the probe always sees ahead
+    // of where the next substep will land.
+    expect(travel).toBeLessThanOrEqual(BIPLANE_TUNING.MAX_STEP_M + 1e-9);
+    expect(travel).toBeLessThanOrEqual(probe);
+  });
+
+  it('biplane cruise is ~3x the bird cruise', () => {
+    const ratio = BIPLANE_TUNING.CRUISE_SPEED / BIRD_TUNING.CRUISE_SPEED;
+    expect(ratio).toBeGreaterThanOrEqual(2.7);
+    expect(ratio).toBeLessThanOrEqual(3.3);
+  });
+
+  it('biplane minimum airspeed is above the bird cruise', () => {
+    // The biplane must never enter walk/stall regimes at bird cruise — its
+    // MIN must sit above the bird's cruise so the swap-clamp bumps a slow
+    // bird up to biplane cruise-ish speed on transition.
+    expect(BIPLANE_TUNING.MIN_AIRSPEED).toBeGreaterThan(BIRD_TUNING.CRUISE_SPEED);
   });
 });
 

@@ -13,6 +13,7 @@ export interface GeoPoint {
 
 export type AppMode = 'flying' | 'perched' | 'walking';
 export type WorldKind = 'dream' | 'photo';
+export type CraftKind = 'bird' | 'biplane';
 
 export interface GroundHit {
   point: Vector3;
@@ -77,10 +78,14 @@ export interface BirdSystemApi {
   readonly mode: AppMode;
   /** Surface the bird could land on right now (drives the UI prompt), else null. */
   readonly landingCandidate: GroundHit | null;
+  /** Which craft is currently active (bird or Wright-style biplane). */
+  readonly craft: CraftKind;
   /** Teleport for takeoff spawn; enters 'flying'. */
   placeAt(position: Vector3, headingRad: number): void;
   /** Physics + animation + camera, one frame. */
   update(dt: number, input: InputState, world: WorldSource): void;
+  /** Swap the active craft mid-flight; preserves pose, clamps speed to new floor. */
+  setCraft(craft: CraftKind): void;
   resize(aspect: number): void;
 }
 

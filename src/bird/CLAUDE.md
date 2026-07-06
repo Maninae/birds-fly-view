@@ -6,15 +6,34 @@ rig, mode transitions. App code only ever touches this one class (via
 
 ```
 bird/
-  BirdSystem.ts     facade: pose, mode machine, delegates to the sub-controllers
+  BirdSystem.ts     facade: pose, mode machine, craft swap, delegates to controllers
   mesh.ts           procedural low-poly tern; wing/foot rig; per-mode pose
+  biplaneMesh.ts    procedural Wright-Flyer biplane; airspeed-driven prop
+  craftMesh.ts      shared { root, update(pose, mode, dt) } interface both meshes satisfy
+  craftTuning.ts    per-craft feel table + BIRD_TUNING / BIPLANE_TUNING presets
   flight.ts         stepFlight() — flying-mode physics + landing detection
   walk.ts           stepWalk()   — walking-mode physics + takeoff trigger
   camera.ts         CameraRig    — chase/first-person, spring damping, FOV ease
   collision.ts      floor clamp · 3-probe wall slide · bird→camera unclip
-  tuning.ts         ALL feel constants (speeds, rates, damping, colors)
+  tuning.ts         shared feel constants (rates, camera, palette) + landing ease
   index.ts          public re-export of BirdSystem
 ```
+
+## Craft swap (C key, bird ⇄ biplane)
+
+`BirdSystem` builds both meshes up-front and stores a `CraftTuning` reference
+that `stepFlight` and `CameraRig.update` read each frame. `setCraft(kind)`:
+
+1. Swaps the mesh child inside the stable `this.object` Group (App keeps a
+   scene-graph handle to that Group; we never replace it).
+2. Points `tuning` at the new preset (`craftTuning.ts::getCraftTuning`).
+3. Clamps `pose.speed` UP to `tuning.MIN_AIRSPEED` (position/heading preserved).
+4. Persists the choice to `localStorage['bfv.craft']`.
+
+Bindings: `InputManager.onCraftToggle` fires on `C` (edge-triggered, text-entry
+target check honored) and App wires it to `bird.setCraft(...)`. The C key rides
+outside `InputState` because that contract is locked; keeping the DOM listener
+inside `InputManager` still preserves the "single reader of DOM events" rule.
 
 ## Collision guarantees
 
@@ -76,9 +95,14 @@ levelled out.
 
 ## Where to tune what
 
-- **Feel** — always `tuning.ts`. Everything numeric lives here so an artist can
-  tweak feel without reading physics code.
-- **Silhouette / palette** — `mesh.ts` for geometry, `tuning.ts` COLOR_* for hues.
+- **Per-craft feel** — `craftTuning.ts`: `BIRD_TUNING` / `BIPLANE_TUNING`. Speed
+  envelope, MAX_STEP_M, bank/yaw, landing window, flap/throttle impulses.
+  Both craft use the SAME steering rates, autolevel, gravity, and camera rig
+  (`tuning.ts`), so they feel like one game with two vehicles.
+- **Shared feel** — `tuning.ts`. Camera rig, autolevel rates, palette, landing
+  ease/arc, wall-probe geometry.
+- **Silhouette / palette** — `mesh.ts` for the bird, `biplaneMesh.ts` for the
+  biplane, `tuning.ts` COLOR_* for hues (shared across both meshes).
 - **Camera softness** — `CHASE_HALFLIFE_*` in `tuning.ts` (half-life = time to
   halve residual error). `CHASE_LATERAL_LAG` is the "bird leans into the turn,
   camera lags" magic number.

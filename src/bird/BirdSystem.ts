@@ -16,23 +16,31 @@
  * Landing itself is a short ease (LAND_EASE_SEC): during ease the physics is
  * paused and the bird is interpolated to the touchdown point/orientation.
  */
-import { Group, Object3D, PerspectiveCamera, Vector3 } from 'three';
+import { Group, PerspectiveCamera, Vector3 } from 'three';
 import type {
   AppMode,
   BirdPose,
   BirdSystemApi,
+  CraftKind,
   GroundHit,
   InputState,
   WorldSource,
 } from '../types.js';
+import { BiplaneMesh } from './biplaneMesh.js';
 import { CameraRig } from './camera.js';
 import type { CollisionMemory } from './collision.js';
 import { enforceGroundFloor, newCollisionMemory } from './collision.js';
+import type { CraftMesh } from './craftMesh.js';
+import type { CraftTuning } from './craftTuning.js';
+import {
+  getCraftTuning,
+  readStoredCraft,
+  writeStoredCraft,
+} from './craftTuning.js';
 import { newFlightMemory, stepFlight } from './flight.js';
 import type { FlightMemory, FlightStepResult } from './flight.js';
 import { BirdMesh } from './mesh.js';
 import {
-  CRUISE_SPEED,
   LAND_ARC_LIFT,
   LAND_EASE_SEC,
   LAND_FLARE_PITCH,
@@ -42,14 +50,22 @@ import { newWalkMemory, stepWalk } from './walk.js';
 import type { WalkMemory } from './walk.js';
 
 export class BirdSystem implements BirdSystemApi {
-  readonly object: Object3D;
+  readonly object: Group;
   readonly camera: PerspectiveCamera;
   readonly pose: BirdPose;
 
   private _mode: AppMode = 'flying';
   private _landing: GroundHit | null = null;
+  private _craft: CraftKind;
 
-  private readonly mesh: BirdMesh;
+  /**
+   * Both meshes are constructed up-front so mid-flight swap is a scene-graph
+   * re-parent, not an allocation. Only the active mesh receives update() ticks.
+   */
+  private readonly meshes: Record<CraftKind, CraftMesh>;
+  private activeMesh: CraftMesh;
+  private tuning: CraftTuning;
+
   private readonly rig: CameraRig;
   private readonly flight: FlightMemory;
   private readonly walk: WalkMemory;
@@ -63,11 +79,32 @@ export class BirdSystem implements BirdSystemApi {
   /** Latch: which mode to enter when the ease completes. */
   private easeTargetMode: AppMode = 'flying';
 
+  /**
+   * Pending craft swap. `setCraft()` records the requested craft here; the swap
+   * is actually applied at the top of `update()` once `easeT === 0`, so a
+   * mid-ease press queues cleanly instead of retargeting the ease against a
+   * different mesh / collision extent. Cleared once applied.
+   */
+  private pendingCraft: CraftKind | null = null;
+
   constructor(aspect: number) {
-    this.mesh = new BirdMesh();
+    this.meshes = {
+      bird: new BirdMesh(),
+      biplane: new BiplaneMesh(),
+    };
+    this._craft = readStoredCraft();
+    this.tuning = getCraftTuning(this._craft);
+    this.activeMesh = this.meshes[this._craft];
+
     this.rig = new CameraRig(aspect);
     this.camera = this.rig.camera;
-    this.object = wrapAsRoot(this.mesh.root);
+
+    // Stable Group parent — App holds a reference to `this.object` for the
+    // scene graph and never re-fetches it, so swap must happen INSIDE this
+    // Group by add/remove of the mesh child, never by replacing `object`.
+    this.object = new Group();
+    this.object.name = 'bird-root';
+    this.object.add(this.activeMesh.root);
 
     this.flight = newFlightMemory();
     this.walk = newWalkMemory();
@@ -78,7 +115,7 @@ export class BirdSystem implements BirdSystemApi {
       yaw: 0,
       pitch: 0,
       roll: 0,
-      speed: CRUISE_SPEED,
+      speed: this.tuning.CRUISE_SPEED,
       flapPhase: 0,
     };
 
@@ -96,13 +133,66 @@ export class BirdSystem implements BirdSystemApi {
   get landingCandidate(): GroundHit | null {
     return this._landing;
   }
+  get craft(): CraftKind {
+    return this._craft;
+  }
+
+  /**
+   * Request a craft swap. The mutation is *queued*, not applied here — the
+   * DOM handler that produces `C` fires outside the frame loop and can arrive
+   * mid-landing-ease or between frames. `update()` applies the queued swap
+   * only when `easeT === 0`, which keeps the ease finishing against its own
+   * mesh and collision extent.
+   *
+   * Preserves position, heading, pitch, roll, and velocity direction. Clamps
+   * speed UP to the new craft's minimum on apply so the biplane never enters
+   * the world sub-stall. Persists to localStorage.
+   */
+  setCraft(craft: CraftKind): void {
+    if (craft === this._craft && this.pendingCraft === null) return;
+    // If the pending swap would just cancel back to current, drop it.
+    if (craft === this._craft) {
+      this.pendingCraft = null;
+      return;
+    }
+    this.pendingCraft = craft;
+  }
+
+  /** Consume any queued craft change. Safe to call every frame. */
+  private applyPendingCraft(): void {
+    if (this.pendingCraft === null) return;
+    if (this.easeT > 0) return;                 // never swap during a landing ease
+    const craft = this.pendingCraft;
+    this.pendingCraft = null;
+    if (craft === this._craft) return;
+    const prev = this._craft;
+    this._craft = craft;
+    this.tuning = getCraftTuning(craft);
+
+    // Scene-graph swap: children only, never the Group handle App holds.
+    this.object.remove(this.meshes[prev].root);
+    this.object.add(this.meshes[craft].root);
+    this.activeMesh = this.meshes[craft];
+
+    // Speed floor: never leave the biplane below its stall speed. Above the
+    // floor we leave `speed` alone; the SPEED_RESTORE term pulls it toward
+    // the new cruise on its own.
+    if (this.pose.speed < this.tuning.MIN_AIRSPEED) {
+      this.pose.speed = this.tuning.MIN_AIRSPEED;
+    }
+    // Zero out flap-lift memory so a mid-swap doesn't carry a bird's wing
+    // impulse into the biplane's throttle model.
+    this.flight.vy = 0;
+
+    writeStoredCraft(craft);
+  }
 
   placeAt(position: Vector3, headingRad: number): void {
     this.pose.position.copy(position);
     this.pose.yaw = headingRad;
     this.pose.pitch = 0;
     this.pose.roll = 0;
-    this.pose.speed = CRUISE_SPEED;
+    this.pose.speed = this.tuning.CRUISE_SPEED;
     this.pose.flapPhase = 0;
     this._mode = 'flying';
     this._landing = null;
@@ -124,6 +214,11 @@ export class BirdSystem implements BirdSystemApi {
   update(dt: number, input: InputState, world: WorldSource): void {
     // Clamp dt so a paused tab doesn't teleport the bird on resume.
     dt = Math.min(dt, 0.1);
+
+    // Apply any queued craft swap before this frame's physics/mesh/camera
+    // read the tuning. Held while easeT > 0 so a landing ease finishes on the
+    // mesh + collision extent it started with.
+    this.applyPendingCraft();
 
     if (this.easeT > 0) {
       this.tickEase(dt);
@@ -150,14 +245,16 @@ export class BirdSystem implements BirdSystemApi {
     }
 
     // Update visual mesh + camera every frame regardless of mode.
-    this.mesh.update(this.pose, this._mode, dt);
-    this.rig.update(this.pose, this._mode, input, world, this.col, dt);
+    this.activeMesh.update(this.pose, this._mode, dt);
+    this.rig.update(this.pose, this._mode, input, world, this.col, this.tuning, dt);
   }
 
   // --- per-mode ticks ------------------------------------------------------
 
   private tickFlying(dt: number, input: InputState, world: WorldSource): void {
-    const res: FlightStepResult = stepFlight(this.pose, this.flight, this.col, input, world, dt);
+    const res: FlightStepResult = stepFlight(
+      this.pose, this.flight, this.col, input, world, this.tuning, dt,
+    );
     this._landing = res.landing;
 
     if (input.interact && this._landing) {
@@ -241,25 +338,13 @@ export class BirdSystem implements BirdSystemApi {
     // If the takeoff pop somehow puts the bird into a hillside (steep terrain
     // + generous pop), the shared floor guarantee fires and lifts us clear.
     enforceGroundFloor(this.pose, this.col, world, 0.05);
-    this.pose.speed = CRUISE_SPEED * 0.7;
+    this.pose.speed = this.tuning.CRUISE_SPEED * 0.7;
     this.pose.pitch = 0.1;   // slight climb
     this.pose.roll = 0;
-    this.flight.vy = 5;      // wing burst
+    this.flight.vy = 5;      // wing / throttle burst
     this.flight.timeSinceBeat = 0;
     this.flight.flareCharge = 0;
     this._mode = 'flying';
     this._landing = null;
   }
-}
-
-/**
- * The public `object` slot exists so App can `scene.add(bird.object)`. We wrap
- * the mesh root in a stable Group so callers don't hold a reference that we
- * ever swap out.
- */
-function wrapAsRoot(inner: Object3D): Object3D {
-  const g = new Group();
-  g.name = 'bird-root';
-  g.add(inner);
-  return g;
 }

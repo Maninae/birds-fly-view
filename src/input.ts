@@ -18,6 +18,11 @@
  *   brake      Shift   (held)
  *   interact   E       (edge — land / take off)
  *   toggleCam  V       (edge — chase ⇄ first-person)
+ *
+ * Out-of-band signal:
+ *   craft toggle   C   — fires `onCraftToggle` (assigned by App). Rides outside
+ *   the `InputState` contract because the contract is locked; kept in this file
+ *   so all keyboard reading still lives in one place.
  */
 import type { InputState } from './types.js';
 
@@ -35,6 +40,13 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
 
 export class InputManager {
   readonly state: InputState;
+
+  /**
+   * Fires on each C keypress (edge). Assigned by App after construction so the
+   * bird can swap craft without wiring a DOM listener of its own. Text-entry
+   * targets are ignored just like every other key handler here.
+   */
+  onCraftToggle: (() => void) | null = null;
 
   private readonly keys = new Set<string>();
 
@@ -115,6 +127,9 @@ export class InputManager {
       this.interactEdge = true;
     } else if (code === 'KeyV') {
       this.toggleCamEdge = true;
+    } else if (code === 'KeyC') {
+      // Ride outside InputState (locked contract) — fire the callback directly.
+      this.onCraftToggle?.();
     }
     this.pushState();
   }

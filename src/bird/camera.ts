@@ -18,6 +18,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import type { AppMode, BirdPose, InputState, WorldSource } from '../types.js';
 import type { CollisionMemory } from './collision.js';
 import { unclipCamera } from './collision.js';
+import type { CraftTuning } from './craftTuning.js';
 import { headingVector } from './flight.js';
 import {
   CAM_GROUND_MARGIN,
@@ -28,7 +29,6 @@ import {
   CHASE_LOOK_Y,
   CHASE_LOOKAHEAD,
   CHASE_UP,
-  CRUISE_SPEED,
   FOV_HALFLIFE,
   FOV_MAX,
   FOV_MIN,
@@ -36,7 +36,6 @@ import {
   FP_BOB_HZ,
   FP_HEAD_FWD,
   FP_HEAD_UP,
-  MAX_AIRSPEED,
   WALK_CAM_BACK,
   WALK_CAM_HALFLIFE,
   WALK_CAM_UP,
@@ -80,6 +79,7 @@ export class CameraRig {
     input: InputState,
     world: WorldSource,
     col: CollisionMemory,
+    tuning: CraftTuning,
     dt: number,
   ): void {
     if (input.toggleCam) this.toggleView();
@@ -126,8 +126,11 @@ export class CameraRig {
       damp(this.smoothLook, _lookAt, rotHalf, dt);
     }
 
-    // FOV eases toward speed-scaled target (chase only).
-    const t = clamp01((pose.speed - CRUISE_SPEED) / (MAX_AIRSPEED - CRUISE_SPEED));
+    // FOV eases toward speed-scaled target (chase only). Range depends on the
+    // active craft: the biplane's cruise / max envelope is very different.
+    const t = clamp01(
+      (pose.speed - tuning.CRUISE_SPEED) / Math.max(1, tuning.MAX_AIRSPEED - tuning.CRUISE_SPEED),
+    );
     const fovTarget = this.view === 'first' ? FOV_MIN + 4 : FOV_MIN + (FOV_MAX - FOV_MIN) * t;
     const fovAlpha = 1 - Math.pow(2, -dt / FOV_HALFLIFE);
     this.smoothFov = this.smoothFov + (fovTarget - this.smoothFov) * fovAlpha;

@@ -57,6 +57,10 @@ async function main(): Promise<void> {
   scene.add(bird.object);
 
   const input = new InputManager(canvas);
+  // Wire the C-key craft swap here too, so the demo mirrors the shipping App.
+  input.onCraftToggle = () => {
+    bird.setCraft(bird.craft === 'bird' ? 'biplane' : 'bird');
+  };
 
   // Optional HUD text.
   const hud = document.getElementById('hud');
