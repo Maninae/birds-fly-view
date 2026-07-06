@@ -86,6 +86,9 @@ export class BirdSystem implements BirdSystemApi {
    */
   private pendingCraft: CraftKind | null = null;
 
+  /** User "turn & pitch speed" multiplier from the settings panel. */
+  private steeringScale = 1;
+
   constructor(aspect: number) {
     this.meshes = {
       bird: new BirdMesh(),
@@ -147,6 +150,11 @@ export class BirdSystem implements BirdSystemApi {
    * speed UP to the new craft's minimum on apply so the biplane never enters
    * the world sub-stall. Persists to localStorage.
    */
+  /** Scale how fast steering chases its targets (0.4..1.6, 1 = default). */
+  setSteeringScale(scale: number): void {
+    this.steeringScale = Math.min(1.6, Math.max(0.4, scale));
+  }
+
   setCraft(craft: CraftKind): void {
     if (craft === this._craft && this.pendingCraft === null) return;
     // If the pending swap would just cancel back to current, drop it.
@@ -252,7 +260,8 @@ export class BirdSystem implements BirdSystemApi {
 
   private tickFlying(dt: number, input: InputState, world: WorldSource): void {
     const res: FlightStepResult = stepFlight(
-      this.pose, this.flight, this.col, input, world, this.tuning, dt,
+      this.pose, this.flight, this.col, input, world, this.tuning,
+      this.steeringScale, dt,
     );
     this._landing = res.landing;
 

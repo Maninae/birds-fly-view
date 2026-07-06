@@ -72,6 +72,7 @@ export function stepFlight(
   input: InputState,
   world: WorldSource,
   tuning: CraftTuning,
+  steeringScale: number,
   dt: number,
 ): FlightStepResult {
   const displacement = pose.speed * dt;
@@ -80,7 +81,7 @@ export function stepFlight(
 
   let result: FlightStepResult = { landing: null, slidingOnWall: false };
   for (let i = 0; i < substeps; i++) {
-    result = advance(pose, mem, col, input, world, tuning, stepDt);
+    result = advance(pose, mem, col, input, world, tuning, steeringScale, stepDt);
   }
   return result;
 }
@@ -92,6 +93,7 @@ function advance(
   input: InputState,
   world: WorldSource,
   tuning: CraftTuning,
+  steeringScale: number,
   dt: number,
 ): FlightStepResult {
   // --- steering: target bank/pitch from key axes only ----------------------
@@ -124,13 +126,16 @@ function advance(
   const hasSteerInput = Math.abs(input.turn) > 0.01;
   const hasPitchInput = Math.abs(input.pitchAxis) > 0.01;
 
+  // steeringScale is the user's "turn & pitch speed" dial (settings panel).
+  // It scales how fast we chase targets and turn, NOT the auto-level decay,
+  // so hands-off recovery always feels the same.
   if (hasSteerInput) {
-    pose.roll = approach(pose.roll, bankTarget, BANK_RATE * dt);
+    pose.roll = approach(pose.roll, bankTarget, BANK_RATE * steeringScale * dt);
   } else {
     pose.roll = approach(pose.roll, 0, AUTOLEVEL_ROLL * dt);
   }
   if (hasPitchInput || mem.flareCharge > 0) {
-    pose.pitch = approach(pose.pitch, pitchTarget, PITCH_RATE * dt);
+    pose.pitch = approach(pose.pitch, pitchTarget, PITCH_RATE * steeringScale * dt);
   } else {
     pose.pitch = approach(pose.pitch, 0, AUTOLEVEL_PITCH * dt);
   }
@@ -139,7 +144,8 @@ function advance(
 
   // Coordinated turn: yaw rate scales with sin(bank).
   const yawRate =
-    tuning.YAW_AT_MAX_BANK * (Math.sin(pose.roll) / Math.sin(tuning.MAX_BANK));
+    tuning.YAW_AT_MAX_BANK * steeringScale *
+    (Math.sin(pose.roll) / Math.sin(tuning.MAX_BANK));
   pose.yaw = wrapAngle(pose.yaw + yawRate * dt);
 
   // --- speed integration --------------------------------------------------

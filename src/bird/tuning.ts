@@ -47,15 +47,15 @@ export const BRAKE_LOW_ALT_MULTIPLIER = 2.0;
 // -- Steering ---------------------------------------------------------------
 
 export const MAX_BANK = Math.PI * 50 / 180;   // ~50°
-export const BANK_RATE = Math.PI * 140 / 180; // rad/s toward target bank
+export const BANK_RATE = Math.PI * 90 / 180;  // rad/s toward target bank (owner: was dizzy at 140)
 export const AUTOLEVEL_ROLL = Math.PI * 90 / 180;  // rad/s decay when idle
 
 export const MAX_PITCH = Math.PI * 55 / 180;
-export const PITCH_RATE = Math.PI * 90 / 180;   // rad/s toward target pitch
+export const PITCH_RATE = Math.PI * 55 / 180;   // rad/s toward target pitch (owner: was dizzy at 90)
 export const AUTOLEVEL_PITCH = Math.PI * 45 / 180;
 
 /** Yaw rate at max bank; scales with sin(bank) for coordinated turn. */
-export const YAW_AT_MAX_BANK = Math.PI * 70 / 180;   // ~70°/s
+export const YAW_AT_MAX_BANK = Math.PI * 42 / 180;   // ~42°/s (owner: 70 was dizzy)
 
 // (Mouse sensitivity constants were removed — the bird never follows the
 // mouse. Keyboard is the only steering surface.)

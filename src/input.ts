@@ -48,6 +48,12 @@ export class InputManager {
    */
   onCraftToggle: (() => void) | null = null;
 
+  /**
+   * When true, pitch keys use stick convention (W/↑ = dive). Wired by App
+   * from the settings panel; default is the direct convention (W/↑ = climb).
+   */
+  invertPitch = false;
+
   private readonly keys = new Set<string>();
 
   // Edge-trigger latches, drained by endFrame().
@@ -176,6 +182,7 @@ export class InputManager {
     let p = 0;
     if (k.has('ArrowUp') || k.has('KeyW')) p += 1;
     if (k.has('ArrowDown') || k.has('KeyS')) p -= 1;
+    if (this.invertPitch) p = -p;
     s.pitchAxis = p < -1 ? -1 : p > 1 ? 1 : p;
   }
 }

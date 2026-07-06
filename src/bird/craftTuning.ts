@@ -56,7 +56,7 @@ export const BIRD_TUNING: CraftTuning = {
   MAX_AIRSPEED: 45,
   MAX_STEP_M: 4.0,
   MAX_BANK: Math.PI * 50 / 180,
-  YAW_AT_MAX_BANK: Math.PI * 70 / 180,
+  YAW_AT_MAX_BANK: Math.PI * 42 / 180,
   FLAP_BEATS_PER_SEC: 2.5,
   FLAP_LIFT_IMPULSE: 4.5,
   FLAP_FWD_IMPULSE: 1.5,
@@ -82,7 +82,7 @@ export const BIPLANE_TUNING: CraftTuning = {
   MAX_AIRSPEED: 95,
   MAX_STEP_M: 1.8,
   MAX_BANK: Math.PI * 42 / 180,
-  YAW_AT_MAX_BANK: Math.PI * 45 / 180,
+  YAW_AT_MAX_BANK: Math.PI * 28 / 180,
   // Space is a throttle burst: big forward push, no vertical lift, tighter cadence.
   FLAP_BEATS_PER_SEC: 4.0,
   FLAP_LIFT_IMPULSE: 0,
