@@ -38,3 +38,9 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # The Pages service intermittently fails first deploys ("try again
+      # later"); one immediate retry has cleared it every time so far.
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
