@@ -112,6 +112,7 @@ function advance(
   // --- auto-flare when low --------------------------------------------------
   // Peek the surface directly below. When we're close to it and the player
   // isn't pulling the nose up toward a landing, bend the pitch upward.
+  col.probeCount++;
   const belowHit = world.groundBelow(pose.position);
   const altitude = belowHit
     ? Math.max(0, pose.position.y - belowHit.point.y)
@@ -192,12 +193,14 @@ function advance(
   // project the horizontal velocity onto the plane perpendicular to the
   // combined outward normal — bird skims the facade, never enters.
   const lookahead = wallLookahead(pose.speed, dt);
-  wallSlide(pose, velX, velZ, lookahead, world, _slide);
+  wallSlide(pose, velX, velZ, lookahead, world, col, _slide);
   velX = _slide.velX;
   velZ = _slide.velZ;
   const slidingOnWall = _slide.hit;
 
-  // Vertical velocity: energy-driven component + flap memory + level sink.
+  // Vertical velocity: purely pitch-driven + flap memory + brake sink.
+  // LEVEL_SINK_RATE = 0 by owner directive — hands-off level flight holds
+  // altitude forever, so the bird never "falls" without an input.
   let dy = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
   if (input.brake) dy -= BRAKE_EXTRA_SINK * brakeBoost;
   dy *= dt;

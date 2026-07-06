@@ -141,13 +141,17 @@ export class BirdSystem implements BirdSystemApi {
       }
     }
 
-    // Belt-and-braces floor: absolute underground guarantee for every mode,
-    // including perched and mid-ease frames — nothing bypasses the clamp.
-    enforceGroundFloor(this.pose, this.col, world, 0.02);
+    // Belt-and-braces floor: the flying/walking steps already clamp inside
+    // their `advance`, so re-running here would double the raycast cost with
+    // no added guarantee. Perched idle + mid-ease frames don't run those
+    // steps, so we clamp only in those modes to keep the invariant.
+    if (this._mode === 'perched' || this.easeT > 0) {
+      enforceGroundFloor(this.pose, this.col, world, 0.02);
+    }
 
     // Update visual mesh + camera every frame regardless of mode.
     this.mesh.update(this.pose, this._mode, dt);
-    this.rig.update(this.pose, this._mode, input, world, dt);
+    this.rig.update(this.pose, this._mode, input, world, this.col, dt);
   }
 
   // --- per-mode ticks ------------------------------------------------------

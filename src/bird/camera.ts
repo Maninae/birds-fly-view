@@ -16,6 +16,7 @@
  */
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { AppMode, BirdPose, InputState, WorldSource } from '../types.js';
+import type { CollisionMemory } from './collision.js';
 import { unclipCamera } from './collision.js';
 import { headingVector } from './flight.js';
 import {
@@ -78,6 +79,7 @@ export class CameraRig {
     mode: AppMode,
     input: InputState,
     world: WorldSource,
+    col: CollisionMemory,
     dt: number,
   ): void {
     if (input.toggleCam) this.toggleView();
@@ -103,6 +105,9 @@ export class CameraRig {
     }
 
     // Floor the camera so it never buries in ground/roof.
+    // (The full bird→camera ray sweep in `unclipCamera` handles wall clip;
+    // this one downward ray is a cheap belt-and-braces for the vertical case.)
+    col.probeCount++;
     const beneath = world.groundBelow(_pos);
     if (beneath) {
       const floor = beneath.point.y + CAM_GROUND_MARGIN;
@@ -133,7 +138,7 @@ export class CameraRig {
     // is always a safe anchor. Only meaningful for chase / walk over-shoulder
     // — first-person cam sits at the bird's head and skips the sweep.
     if (this.view !== 'first') {
-      unclipCamera(this.smoothPos, pose.position, world);
+      unclipCamera(this.smoothPos, pose.position, world, col);
     }
 
     this.camera.position.copy(this.smoothPos);

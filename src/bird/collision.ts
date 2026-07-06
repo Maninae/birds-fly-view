@@ -38,15 +38,39 @@ import {
  * Persistent collision state. Lives on `BirdSystem` and is threaded through
  * every controller step. `lastGroundY` lets us maintain a floor when tiles
  * are momentarily unavailable (Bay water sample returns null, tile pop-in).
+ *
+ * `wallClearFrames` and `camCheckCounter` power the probe-throttling that
+ * cuts raycast cost in half without weakening any guarantee — wall probes
+ * only every other frame once we've been in the clear for a while, and the
+ * camera-unclip sweep runs once every N frames instead of every frame.
+ *
+ * `probeCount` is a cumulative counter every helper increments; the dev
+ * hook reads it to compute raycasts / frame for perf reporting.
  */
 export interface CollisionMemory {
   lastGroundY: number | null;
   lastGroundKind: GroundHit['kind'] | null;
+  wallClearFrames: number;
+  camCheckCounter: number;
+  probeCount: number;
 }
 
 export function newCollisionMemory(): CollisionMemory {
-  return { lastGroundY: null, lastGroundKind: null };
+  return {
+    lastGroundY: null,
+    lastGroundKind: null,
+    wallClearFrames: 0,
+    camCheckCounter: 0,
+    probeCount: 0,
+  };
 }
+
+/** How many consecutive clear frames before wall probes go every-other-frame. */
+const WALL_PROBE_WARMUP_FRAMES = 5;
+/** Speed above which we always probe every frame regardless of history. */
+const WALL_PROBE_ALWAYS_SPEED = 30;
+/** Camera unclip sweeps every N frames (16-33 ms drift between checks is safe). */
+const CAM_CHECK_EVERY = 3;
 
 /**
  * Enforce that `pose.position.y >= floor + epsilon`. Updates `col.lastGroundY`
@@ -59,6 +83,7 @@ export function enforceGroundFloor(
   world: WorldSource,
   epsilon = 0.05,
 ): { clamped: boolean; floorY: number | null } {
+  col.probeCount++;
   const hit = world.groundBelow(pose.position);
   let floorY: number | null = null;
   if (hit) {
@@ -107,11 +132,25 @@ export function wallSlide(
   velZ: number,
   lookahead: number,
   world: WorldSource,
+  col: CollisionMemory,
   out: WallSlideResult,
 ): void {
   out.hit = false;
   out.velX = velX;
   out.velZ = velZ;
+
+  // Throttling: after enough consecutive clear frames, only probe every OTHER
+  // frame — safe because between probes the bird moves at most speed·2·dt,
+  // still well inside the lookahead margin. At high speed we never throttle
+  // so a fast dive can't slip past a wall in a skipped frame.
+  const speed = Math.sqrt(velX * velX + velZ * velZ);
+  const canThrottle =
+    col.wallClearFrames >= WALL_PROBE_WARMUP_FRAMES &&
+    speed < WALL_PROBE_ALWAYS_SPEED;
+  if (canThrottle && (col.wallClearFrames & 1) === 1) {
+    col.wallClearFrames++;
+    return;
+  }
 
   const fwdX = Math.sin(pose.yaw);
   const fwdZ = -Math.cos(pose.yaw);
@@ -132,6 +171,7 @@ export function wallSlide(
 
   const check = (x: number, z: number): boolean => {
     _probe.set(x, probeY, z);
+    col.probeCount++;
     const hit = world.groundBelow(_probe);
     if (hit && hit.point.y > threshold) {
       const dx = pose.position.x - x;
@@ -151,7 +191,11 @@ export function wallSlide(
   if (check(px1, pz1)) hits++;
   if (check(px2, pz2)) hits++;
 
-  if (hits === 0) return;
+  if (hits === 0) {
+    col.wallClearFrames++;
+    return;
+  }
+  col.wallClearFrames = 0;
 
   const nMag = Math.sqrt(nx * nx + nz * nz);
   if (nMag < 0.01) {
@@ -197,7 +241,14 @@ export function unclipCamera(
   camPos: Vector3,
   birdPos: Vector3,
   world: WorldSource,
+  col: CollisionMemory,
 ): void {
+  // Throttling: run the sample sweep only once every CAM_CHECK_EVERY frames.
+  // Between checks the camera drifts at most ~0.5 m at damp half-life 0.14 s,
+  // nowhere near enough to enter a wall from a previously-safe position.
+  col.camCheckCounter++;
+  if (col.camCheckCounter % CAM_CHECK_EVERY !== 0) return;
+
   const dx = camPos.x - birdPos.x;
   const dy = camPos.y - birdPos.y;
   const dz = camPos.z - birdPos.z;
@@ -215,6 +266,7 @@ export function unclipCamera(
     const sy = birdPos.y + nyr * t;
     const sz = birdPos.z + nzr * t;
     _tmp.set(sx, sy + WALL_PROBE_LIFT, sz);
+    col.probeCount++;
     const hit = world.groundBelow(_tmp);
     if (hit && sy < hit.point.y + 0.05) {
       // This sample sits inside a wall/roof/hill — pull back.

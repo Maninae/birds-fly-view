@@ -16,7 +16,12 @@ export const MIN_AIRSPEED = 8;          // asymptote low speed slides toward
 export const MAX_AIRSPEED = 45;         // dive terminal
 
 export const GRAVITY = 9.81;
-export const LEVEL_SINK_RATE = 1.2;     // m/s downward drift when gliding level
+/**
+ * Legacy: baseline sink while gliding level. Set to 0 by owner directive
+ * (2026-07-05) — hands-off level flight now holds altitude forever, no bleed.
+ * Descend only via pitch-down, brake, or intentional flap-off.
+ */
+export const LEVEL_SINK_RATE = 0;
 
 // Energy conversion: pitch is scaled roughly like sin(pitch) * g contributes to
 // dv/dt. Dive gains ~g*sin at pitch, climb loses ~g*sin plus a drag penalty.

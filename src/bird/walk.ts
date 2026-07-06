@@ -75,7 +75,7 @@ export function stepWalk(
   mem.velZ = approach(mem.velZ, desiredZ, WALK_ACCEL * dt);
 
   // Wall slide even while walking — bird can't stuff itself into a facade.
-  wallSlide(pose, mem.velX, mem.velZ, wallLookahead(WALK_SPEED, dt), world, _slide);
+  wallSlide(pose, mem.velX, mem.velZ, wallLookahead(WALK_SPEED, dt), world, col, _slide);
   mem.velX = _slide.velX;
   mem.velZ = _slide.velZ;
   const moving = Math.hypot(mem.velX, mem.velZ);
