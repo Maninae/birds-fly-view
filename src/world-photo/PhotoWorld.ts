@@ -29,6 +29,20 @@ import { waitForInitialTiles } from './ready.js';
 /** How long init() waits for tiles near origin to load before resolving anyway. */
 const INIT_TIMEOUT_MS = 8000;
 
+/**
+ * Altitude-adaptive streaming detail. `errorTarget` is screen-space error in
+ * pixels (LOWER = finer tiles; library default 16). Near the ground we force
+ * the deepest LODs Google serves; at cruise altitude coarser tiles are
+ * indistinguishable and much cheaper to stream and render.
+ */
+const DETAIL_ERROR_TARGET = { low: 4, mid: 12, high: 20 } as const;
+type DetailTier = keyof typeof DETAIL_ERROR_TARGET;
+/** Hysteresis bands (meters AGL) so tier flips are rare, not per-frame. */
+const LOW_ENTER_AGL_M = 100;
+const LOW_EXIT_AGL_M = 140;
+const HIGH_ENTER_AGL_M = 380;
+const HIGH_EXIT_AGL_M = 320;
+
 export class PhotoWorld implements WorldSource {
   readonly root: Group;
 
@@ -39,6 +53,13 @@ export class PhotoWorld implements WorldSource {
   private camera: PerspectiveCamera | null = null;
   private renderer: WebGLRenderer | null = null;
   private disposed = false;
+
+  // Altitude-adaptive detail state. lastGroundY is refreshed by groundBelow()
+  // (the bird's landing probe calls it every frame in flight), so update()
+  // gets AGL for free without a second raycast.
+  private detailTier: DetailTier = 'mid';
+  private lastGroundY = 0;
+  private hasGroundSample = false;
 
   constructor(apiKey: string) {
     if (!apiKey || typeof apiKey !== 'string') {
@@ -94,16 +115,32 @@ export class PhotoWorld implements WorldSource {
     }
   }
 
-  update(_cameraPos: Vector3, _dt: number): void {
+  update(cameraPos: Vector3, _dt: number): void {
     const tiles = this.tiles;
     if (!tiles || !this.camera || !this.renderer) return;
+    const agl = this.hasGroundSample ? cameraPos.y - this.lastGroundY : cameraPos.y;
+    if (this.detailTier === 'low') {
+      if (agl > LOW_EXIT_AGL_M) this.detailTier = 'mid';
+    } else if (this.detailTier === 'high') {
+      if (agl < HIGH_EXIT_AGL_M) this.detailTier = 'mid';
+    } else if (agl < LOW_ENTER_AGL_M) {
+      this.detailTier = 'low';
+    } else if (agl > HIGH_ENTER_AGL_M) {
+      this.detailTier = 'high';
+    }
+    tiles.errorTarget = DETAIL_ERROR_TARGET[this.detailTier];
     tiles.setResolutionFromRenderer(this.camera, this.renderer);
     tiles.update();
   }
 
   groundBelow(pos: Vector3, maxDist = 500): GroundHit | null {
     if (!this.tiles) return null;
-    return groundBelow(this.rayDown, this.root, pos, maxDist);
+    const hit = groundBelow(this.rayDown, this.root, pos, maxDist);
+    if (hit) {
+      this.lastGroundY = hit.point.y;
+      this.hasGroundSample = true;
+    }
+    return hit;
   }
 
   attributions(): string[] {
