@@ -23,6 +23,16 @@ import type { InputState } from './types.js';
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
+/** True when the event landed in a text-entry element (input/textarea/contenteditable). */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target.isContentEditable
+  );
+}
+
 export class InputManager {
   readonly state: InputState;
 
@@ -82,6 +92,9 @@ export class InputManager {
   // --- event handlers --------------------------------------------------------
 
   private onKeyDown(e: KeyboardEvent): void {
+    // Typing in a text field (address search, key modal) must never be
+    // captured as game input — Space especially, which we preventDefault below.
+    if (isTextEntryTarget(e.target)) return;
     const code = e.code;
     // Prevent page-scroll from arrows/space while game is focused.
     if (
