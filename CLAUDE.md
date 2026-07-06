@@ -8,10 +8,17 @@ the vision, art direction, data-source facts, and cut-lines.
 ## Commands
 
 ```bash
-npm run dev        # vite dev server
+npm run dev        # vite dev server — ALWAYS port 5190 (set in vite.config.ts)
 npm run build      # tsc + vite build → dist/
 npm test           # vitest
 ```
+
+Port 5190 is canonical for this project: the owner's Google Maps key
+(photoreal mode) is referrer-locked to `https://maninae.github.io/*` and
+`http://localhost:5190/*`, so photoreal only works locally on 5190. The key
+lives in the owner's macOS Keychain as service `bfv-google-maps` (read with
+`security find-generic-password -s bfv-google-maps -w`) — never commit it.
+Parallel non-photoreal test servers may use other ports via `--port`.
 
 Dev harness pages (served by vite dev, not part of the shipped app):
 `/world-demo.html` (stylized world only), `/bird-demo.html` (bird physics only).

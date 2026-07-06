@@ -52,7 +52,8 @@ away (Google Photorealistic 3D Tiles, ~1,000 free sessions/month; setup steps be
 1. Google Cloud Console → create/pick a project → **enable billing** (required).
 2. Enable **Map Tiles API**.
 3. Create an API key; restrict: HTTP referrers `https://maninae.github.io/*` +
-   `http://localhost:*/*`, API restriction = Map Tiles API.
+   `http://localhost:5190/*` (Google's console rejects port wildcards;
+   5190 is this repo's canonical dev port), API restriction = Map Tiles API.
 4. In the app: "photoreal mode" → paste key (stored only in your localStorage).
 Free tier = 1,000 sessions/month; one session ≈ one page-load ≤ 3 hours of flying.
 
