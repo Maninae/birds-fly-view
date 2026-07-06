@@ -126,6 +126,11 @@ function boot(): void {
         void doTakeoff(p, label, headingDeg);
       },
       onWorldKind,
+      onCraftSelect: (craft) => state.bird?.setCraft(craft),
+      // No-op in the dev harness — FakeBird flies a fixed circle with no
+      // user steering, and the dev harness uses no InputManager.
+      onSteeringScale: () => undefined,
+      onInvertPitch: () => undefined,
     },
   });
 

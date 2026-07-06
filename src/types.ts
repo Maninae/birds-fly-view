@@ -86,6 +86,13 @@ export interface BirdSystemApi {
   update(dt: number, input: InputState, world: WorldSource): void;
   /** Swap the active craft mid-flight; preserves pose, clamps speed to new floor. */
   setCraft(craft: CraftKind): void;
+  /**
+   * Multiplier on yaw / bank / pitch steering rates (0.4..1.6). Values below 1
+   * calm the controls for beginners; above 1 speeds them up. Clamped
+   * internally. Persists across takeoffs — App re-applies the stored value
+   * whenever a fresh bird is constructed.
+   */
+  setSteeringScale(scale: number): void;
   resize(aspect: number): void;
 }
 
@@ -107,6 +114,22 @@ export interface UiHooks {
    */
   onTakeoff(point: GeoPoint, label: string, headingDeg?: number): void;
   onWorldKind(kind: WorldKind, apiKey?: string): void;
+  /**
+   * Settings-panel craft pick. App gates on flying + world present, same as
+   * the C-key toggle, and drops the request if either isn't ready yet.
+   */
+  onCraftSelect(craft: CraftKind): void;
+  /**
+   * Settings-panel steering-rate slider (0.4..1.6). App forwards to
+   * `bird.setSteeringScale` when a bird exists; the UI also persists the
+   * value to localStorage so a future bird construction can re-apply it.
+   */
+  onSteeringScale(scale: number): void;
+  /**
+   * Invert-pitch toggle. Off = W/↑ climb (direct convention); on = W/↑ dive
+   * (stick style). App flips `input.invertPitch` at the InputManager.
+   */
+  onInvertPitch(inverted: boolean): void;
 }
 
 export interface UiApi {
@@ -123,4 +146,11 @@ export interface UiApi {
    * allocation-free (the shipped minimap blits one cached sprite).
    */
   updateMap?(lon: number, lat: number, headingDeg: number): void;
+  /**
+   * Push the current craft and world kind to the settings panel so its
+   * segmented controls reflect app state (including a photoreal→dream
+   * fallback). Optional so demos/tests that omit the panel still satisfy
+   * the contract. App calls this only on change, not per frame.
+   */
+  updateSettings?(s: { craft: CraftKind; worldKind: WorldKind }): void;
 }

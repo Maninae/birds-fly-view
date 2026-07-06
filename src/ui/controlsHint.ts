@@ -12,6 +12,8 @@ const FADE_MS = 8000;
 export interface ControlsHintHandle {
   root: HTMLElement;
   showOnce(): void;
+  /** Bypass the "seen" gate — used by the settings panel's re-show button. */
+  showNow(): void;
   dispose(): void;
 }
 
@@ -27,6 +29,16 @@ export function createControlsHint(): ControlsHintHandle {
 
   let timer: number | null = null;
 
+  const startFade = (): void => {
+    root.style.display = 'block';
+    root.style.opacity = '1';
+    if (timer !== null) clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      root.style.opacity = '0';
+      setTimeout(() => (root.style.display = 'none'), 550);
+    }, FADE_MS);
+  };
+
   return {
     root,
     showOnce() {
@@ -37,18 +49,15 @@ export function createControlsHint(): ControlsHintHandle {
         // storage disabled — always show.
       }
       if (seen) return;
-      root.style.display = 'block';
-      root.style.opacity = '1';
-      if (timer !== null) clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        root.style.opacity = '0';
-        setTimeout(() => (root.style.display = 'none'), 550);
-      }, FADE_MS);
+      startFade();
       try {
         localStorage.setItem(SEEN_KEY, '1');
       } catch {
         // ignore
       }
+    },
+    showNow() {
+      startFade();
     },
     dispose() {
       if (timer !== null) clearTimeout(timer);

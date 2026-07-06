@@ -140,10 +140,10 @@ export const HUD_CSS = /* css */ `
     pointer-events: none;
   }
 
-  /* Controls hint — first-flight only, top-right. */
+  /* Controls hint — first-flight only, top-right, tucked below the settings gear. */
   .bfv-controls-hint {
     position: absolute;
-    top: 24px;
+    top: 72px;
     right: 24px;
     font-family: var(--bfv-font-sans);
     font-size: 12px;

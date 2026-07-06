@@ -39,7 +39,9 @@ export class WorldSwitcher {
   private world: WorldSource | null = null;
   // Photoreal is the default whenever a key is on hand (owner directive);
   // dream is the no-signal fallback, and every photo failure degrades to it.
-  private worldKind: WorldKind = storedGoogleKey() ? 'photo' : 'dream';
+  // `_worldKind` is the private source of truth; `worldKind` getter is the
+  // read surface consumed by App (settings panel projection).
+  private _worldKind: WorldKind = storedGoogleKey() ? 'photo' : 'dream';
   private lastOrigin: GeoPoint | null = null;
 
   /** Monotonic id bumped on every entry to a lifecycle operation. */
@@ -57,6 +59,10 @@ export class WorldSwitcher {
   }
   get origin(): GeoPoint | null {
     return this.lastOrigin;
+  }
+  /** The kind currently in effect (including any photoreal→dream fallback). */
+  get worldKind(): WorldKind {
+    return this._worldKind;
   }
 
   /**
@@ -88,7 +94,7 @@ export class WorldSwitcher {
       // takeoff but the key is missing, the module fails to load, or the
       // tiles fail to init (bad key, quota, network), fall through to dream
       // so the user still gets a world.
-      const kindAtStart = this.worldKind;
+      const kindAtStart = this._worldKind;
       try {
         local = await this.buildForKind(kindAtStart);
         if (this.gen !== myGen) {
@@ -110,7 +116,7 @@ export class WorldSwitcher {
         if (kindAtStart !== 'photo') throw photoErr;
         console.warn('photoreal failed at takeoff — falling back to dream', photoErr);
         this.ui.setError('photoreal tiles didn’t load — flying dream instead.');
-        this.worldKind = 'dream';
+        this._worldKind = 'dream';
         if (local) {
           this.scene.remove(local.root);
           local.dispose();
@@ -153,7 +159,7 @@ export class WorldSwitcher {
    * we haven't flown yet — the next takeoff will honor the new kind.
    */
   async switchKind(kind: WorldKind, apiKey?: string): Promise<void> {
-    if (kind === this.worldKind) return;
+    if (kind === this._worldKind) return;
 
     if (kind === 'photo') {
       if (!apiKey) {
@@ -167,7 +173,7 @@ export class WorldSwitcher {
       }
     }
 
-    this.worldKind = kind;
+    this._worldKind = kind;
     if (!this.lastOrigin) return;
 
     const myGen = ++this.gen;
@@ -217,7 +223,7 @@ export class WorldSwitcher {
         local.dispose();
       }
       // Fall back to a fresh dream world so we're not left blank.
-      this.worldKind = 'dream';
+      this._worldKind = 'dream';
       try {
         const fallback = this.factories.world();
         if (this.gen !== myGen) {

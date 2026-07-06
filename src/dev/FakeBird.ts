@@ -52,6 +52,10 @@ export class FakeBird implements BirdSystemApi {
     this._craft = craft;
   }
 
+  setSteeringScale(_scale: number): void {
+    // No-op — the FakeBird flies a fixed circle and has no user steering.
+  }
+
   placeAt(position: Vector3, headingRad: number): void {
     this._pose.position.copy(position);
     this._pose.yaw = headingRad;

@@ -18,6 +18,9 @@ function boot(): void {
       onTakeoff: (point, label, headingDeg) =>
         holder.app?.hooks().onTakeoff(point, label, headingDeg),
       onWorldKind: (kind, apiKey) => holder.app?.hooks().onWorldKind(kind, apiKey),
+      onCraftSelect: (craft) => holder.app?.hooks().onCraftSelect(craft),
+      onSteeringScale: (scale) => holder.app?.hooks().onSteeringScale(scale),
+      onInvertPitch: (inv) => holder.app?.hooks().onInvertPitch(inv),
     },
   });
 

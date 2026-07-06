@@ -14,11 +14,13 @@ import { START_ALTITUDE_M } from '../config';
 import { EnuFrame } from '../geo/mercator';
 import type {
   BirdSystemApi,
+  CraftKind,
   GeoPoint,
   HudState,
   InputState,
   UiApi,
   UiHooks,
+  WorldKind,
   WorldSource,
 } from '../types';
 
@@ -36,6 +38,31 @@ const MAX_DT_S = 0.05;
 const GROUND_PROBE_HEIGHT = 4000;
 const GROUND_PROBE_RANGE = 5000;
 
+/** localStorage keys owned by the settings panel and reapplied here. */
+const STEERING_SCALE_KEY = 'bfv.steeringScale';
+const INVERT_PITCH_KEY = 'bfv.invertPitch';
+
+/** Read the persisted steering scale, clamped and defaulting to 1. */
+function readStoredSteeringScale(): number {
+  try {
+    const raw = localStorage.getItem(STEERING_SCALE_KEY);
+    if (!raw) return 1;
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v)) return 1;
+    return Math.min(1.6, Math.max(0.4, v));
+  } catch {
+    return 1;
+  }
+}
+/** Read the persisted invert-pitch preference; default off. */
+function readStoredInvertPitch(): boolean {
+  try {
+    return localStorage.getItem(INVERT_PITCH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Worlds that need the render camera before init() — PhotoWorld's tile LOD. */
 function hasSetCamera(w: WorldSource): w is WorldSource & {
   setCamera(camera: PerspectiveCamera, renderer: WebGLRenderer): void;
@@ -44,15 +71,17 @@ function hasSetCamera(w: WorldSource): w is WorldSource & {
 }
 
 /**
- * `input` handle returned by the factory. Exposes an optional `onCraftToggle`
- * callback slot; App assigns it to `bird.setCraft(...)` so a single key (C)
- * swaps the active craft without breaching the locked `InputState` contract.
+ * `input` handle returned by the factory. Exposes optional side-channel slots
+ * that ride outside the locked `InputState` contract:
+ *   - `onCraftToggle`: assigned by App to swap the active craft on `C`.
+ *   - `invertPitch`: settings-panel flip for W/↑ climb vs dive.
  */
 export interface AppInputHandle {
   readonly state: InputState;
   endFrame(): void;
   dispose(): void;
   onCraftToggle?: (() => void) | null;
+  invertPitch?: boolean;
 }
 
 /**
@@ -122,6 +151,11 @@ export class App {
   private rafId: number | null = null;
   private disposed = false;
 
+  // Last values pushed to the settings panel; compared each HUD tick so we
+  // only call `ui.updateSettings` when something actually changed.
+  private lastPushedCraft: CraftKind | null = null;
+  private lastPushedWorldKind: WorldKind | null = null;
+
   /**
    * ENU frame cache for the minimap tick. Rebuilt only when the takeoff
    * origin changes (`switcher.origin` is the source of truth). The scratch
@@ -186,6 +220,22 @@ export class App {
       onWorldKind: (kind, apiKey) => {
         void this.switcher.switchKind(kind, apiKey);
       },
+      onCraftSelect: (craft) => {
+        // Same gates as the C-key toggle: needs a bird, active flight, and a
+        // world. BirdSystem.setCraft is idempotent when craft matches current.
+        if (!this.bird || !this.flying || !this.switcher.current) return;
+        this.bird.setCraft(craft);
+      },
+      onSteeringScale: (scale) => {
+        // Apply live if the bird already exists; either way, the panel has
+        // just persisted the value so a fresh bird can re-read it on takeoff.
+        this.bird?.setSteeringScale(scale);
+      },
+      onInvertPitch: (inverted) => {
+        // Same shape: flip the InputManager slot if it's already up, otherwise
+        // the input factory will read the persisted flag when it constructs.
+        if (this.input) this.input.invertPitch = inverted;
+      },
     };
   }
 
@@ -199,6 +249,9 @@ export class App {
     if (!this.bird) {
       const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
       this.bird = this.factories.bird(aspect);
+      // Re-apply the persisted steering scale so a returning player keeps
+      // their calmer/faster controls without touching the panel.
+      this.bird.setSteeringScale(readStoredSteeringScale());
       this.scene.add(this.bird.object);
     }
 
@@ -218,6 +271,9 @@ export class App {
 
     if (!this.input) {
       this.input = this.factories.input(this.canvas);
+      // Re-apply the persisted invert-pitch preference so returning players
+      // don't have to re-flip the toggle on every session.
+      this.input.invertPitch = readStoredInvertPitch();
       // C key swaps craft. Wired here (not inside InputManager) so the toggle
       // knows which bird instance to talk to. Gated on world present + flying:
       // the DOM handler fires outside the frame loop and can arrive mid title-
@@ -256,6 +312,7 @@ export class App {
       const now = performance.now();
       if (now - this.lastHudTs > HUD_INTERVAL_MS) {
         this.pushHud(world);
+        this.pushSettingsIfChanged();
         this.lastHudTs = now;
       }
       this.updateLandingPrompt();
@@ -310,6 +367,22 @@ export class App {
     const pose = this.bird.pose;
     this.mapFrame.enuToGeo(pose.position.x, pose.position.z, this.mapScratch);
     this.ui.updateMap(this.mapScratch.lon, this.mapScratch.lat, yawToCompassDeg(pose.yaw));
+  }
+
+  /**
+   * Push craft + world kind to the settings panel when either changes. Cheap:
+   * two identity comparisons per HUD tick (~5 Hz). BirdSystem.craft and
+   * WorldSwitcher.worldKind are the sources of truth — the panel reflects the
+   * actual current kind including any photoreal→dream fallback.
+   */
+  private pushSettingsIfChanged(): void {
+    if (!this.bird || !this.ui.updateSettings) return;
+    const craft = this.bird.craft;
+    const kind = this.switcher.worldKind;
+    if (craft === this.lastPushedCraft && kind === this.lastPushedWorldKind) return;
+    this.lastPushedCraft = craft;
+    this.lastPushedWorldKind = kind;
+    this.ui.updateSettings({ craft, worldKind: kind });
   }
 
   private updateLandingPrompt(): void {
