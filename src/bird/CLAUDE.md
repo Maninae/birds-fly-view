@@ -72,7 +72,7 @@ inside `InputManager` still preserves the "single reader of DOM events" rule.
 | Input | Flight | Walk |
 |---|---|---|
 | A/D or ←/→ | bank (target roll → coordinated yaw) | turn `pose.yaw` in place |
-| W/S or ↑/↓ | pitch — stick-style, ↓/S = nose up | walk forward/back along facing |
+| W/S or ↑/↓ | pitch — direct, W/↑ = climb, S/↓ = dive | walk forward/back along facing |
 | Space (tap) | flap impulse | hop |
 | Space (hold) | wing-beat rhythm | ≥ `WALK_TAKEOFF_HOLD` → takeoff |
 | Shift | air brake (harder below 30 m) | — |

@@ -13,7 +13,7 @@
  * Controls:
  *   forward    W/S     or ↑/↓           (walk mode: move / flight: unused)
  *   turn       A/D     or ←/→           (bank in flight; turn-in-place in walk)
- *   pitchAxis  ↑/↓     also W/S         (climb/dive; stick-style: down = nose up)
+ *   pitchAxis  ↑/↓     also W/S         (direct: W/↑ = climb, S/↓ = dive)
  *   flap       Space   (edge + held)
  *   brake      Shift   (held)
  *   interact   E       (edge — land / take off)
@@ -170,12 +170,12 @@ export class InputManager {
     if (k.has('KeyD') || k.has('ArrowRight')) t += 1;
     if (k.has('KeyA') || k.has('ArrowLeft')) t -= 1;
     s.turn = t;
-    // Pitch: stick-style — pulling "back" (↓ or S) raises the nose (positive),
-    // pushing "forward" (↑ or W) drops it. Both hands work equivalently in flight;
-    // in walk mode the same keys drive `forward` and pitchAxis is ignored.
+    // Pitch: direct convention (owner preference) — W/↑ raises the nose and
+    // climbs, S/↓ dives. Positive pitchAxis = nose up. In walk mode the same
+    // keys drive `forward` and pitchAxis is ignored.
     let p = 0;
-    if (k.has('ArrowDown') || k.has('KeyS')) p += 1;
-    if (k.has('ArrowUp') || k.has('KeyW')) p -= 1;
+    if (k.has('ArrowUp') || k.has('KeyW')) p += 1;
+    if (k.has('ArrowDown') || k.has('KeyS')) p -= 1;
     s.pitchAxis = p < -1 ? -1 : p > 1 ? 1 : p;
   }
 }
