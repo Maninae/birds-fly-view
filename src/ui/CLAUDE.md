@@ -8,7 +8,10 @@ serif stack (Iowan Old Style/Palatino/Georgia); body uses the system sans.
 
 - `createUi.ts` — the seam. Wires every subcomponent and returns the `UiApi`
   that App drives. Callers pass `UiHooks` (takeoff, world-kind).
-- `styles.ts` — the entire stylesheet (`installStyles()` is idempotent).
+- `styles.ts`: composes the stylesheet from `./styles/` modules
+  (`installStyles()` is idempotent). Sub-modules: `base` (palette + reset),
+  `title` (start screen), `hud` (in-flight readouts + attribution),
+  `modal` (loading/toast/key modal), `minimap` (corner map card).
 - `title.ts` — start-screen overlay. Wordmark + tagline + search form +
   result list + preset chips + attribution/photoreal footer.
 - `hud.ts` — top-center place label + bottom-center readout + mode chip.
@@ -21,6 +24,13 @@ serif stack (Iowan Old Style/Palatino/Georgia); body uses the system sans.
 - `keyModal.ts` — Google Maps key modal for photoreal mode.
 - `searchButton.ts` — mid-flight "⌕ somewhere else" whisper button;
   click opens the title veil in mid-flight (translucent) mode.
+- `minimap.ts`: bottom-left Bay Area orienting card. Bakes the coastline
+  sprite from `bayCoastline.ts` once at construction, then blits it every
+  frame and paints the player dot + heading wedge on top. Zero-alloc hot
+  path (scalar projection helpers, palette and preset positions resolved
+  once at construction).
+- `bayCoastline.ts`: simplified OSM Bay Area coastline, baked in-tree
+  (~23 KB). Never fetched at runtime.
 
 ## Mid-flight title state
 

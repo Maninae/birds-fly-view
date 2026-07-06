@@ -11,6 +11,7 @@ import {
 } from 'three';
 
 import { START_ALTITUDE_M } from '../config';
+import { EnuFrame } from '../geo/mercator';
 import type {
   BirdSystemApi,
   GeoPoint,
@@ -120,6 +121,16 @@ export class App {
   private lastLandingKind: 'roof' | 'ground' | null = null;
   private rafId: number | null = null;
   private disposed = false;
+
+  /**
+   * ENU frame cache for the minimap tick. Rebuilt only when the takeoff
+   * origin changes (`switcher.origin` is the source of truth). The scratch
+   * object is reused every frame so the hot path allocates nothing.
+   */
+  private mapFrame: EnuFrame | null = null;
+  private mapFrameLat = NaN;
+  private mapFrameLon = NaN;
+  private readonly mapScratch = { lat: 0, lon: 0 };
 
   constructor(opts: AppOptions) {
     this.canvas = opts.canvas;
@@ -248,6 +259,7 @@ export class App {
         this.lastHudTs = now;
       }
       this.updateLandingPrompt();
+      this.pushMinimap();
       this.renderer.render(this.scene, this.bird.camera);
       this.input.endFrame();
     } else {
@@ -275,6 +287,29 @@ export class App {
       attributions: world.attributions(),
     };
     this.ui.updateHud(hud);
+  }
+
+  /**
+   * Push bird lon/lat + heading to the minimap every frame. Zero-alloc: the
+   * ENU frame is cached per origin (rebuilt only when takeoff re-anchors),
+   * and `enuToGeo` writes into a persistent scratch object.
+   */
+  private pushMinimap(): void {
+    if (!this.bird || !this.ui.updateMap) return;
+    const origin = this.switcher.origin;
+    if (!origin) return;
+    if (
+      !this.mapFrame ||
+      this.mapFrameLat !== origin.lat ||
+      this.mapFrameLon !== origin.lon
+    ) {
+      this.mapFrame = new EnuFrame(origin);
+      this.mapFrameLat = origin.lat;
+      this.mapFrameLon = origin.lon;
+    }
+    const pose = this.bird.pose;
+    this.mapFrame.enuToGeo(pose.position.x, pose.position.z, this.mapScratch);
+    this.ui.updateMap(this.mapScratch.lon, this.mapScratch.lat, yawToCompassDeg(pose.yaw));
   }
 
   private updateLandingPrompt(): void {

@@ -116,4 +116,10 @@ export interface UiApi {
   showLandingPrompt(kind: 'roof' | 'ground' | null): void;
   setLoading(msg: string | null): void;
   setError(msg: string | null): void;
+  /**
+   * Push the current geographic position + compass heading to the corner
+   * minimap. Optional so demos/tests that omit the minimap still satisfy the
+   * contract. Callers throttle to keep DOM writes off the hot path.
+   */
+  updateMap?(lon: number, lat: number, headingDeg: number): void;
 }

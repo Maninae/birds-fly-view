@@ -77,6 +77,22 @@ describe('EnuFrame', () => {
     expect(p.z).toBeLessThan(0);                       // north is −z in three
     expect(Math.abs(-p.z - M_PER_DEG_LAT)).toBeLessThan(1);
   });
+
+  it('enuToGeo(out) writes into the caller-provided object (zero-alloc hot path)', () => {
+    // The minimap's per-frame tick reuses one scratch object; this test guards
+    // the contract that `out` is filled AND returned as the same reference.
+    const f = new EnuFrame(origin);
+    const out = { lat: 0, lon: 0 };
+    const returned = f.enuToGeo(0, 0, out);
+    expect(returned).toBe(out);
+    expect(Math.abs(out.lat - origin.lat)).toBeLessThan(1e-9);
+    expect(Math.abs(out.lon - origin.lon)).toBeLessThan(1e-9);
+    // Different input must overwrite; scratch stays the same identity.
+    const returned2 = f.enuToGeo(1000, -2000, out);
+    expect(returned2).toBe(out);
+    expect(out.lat).toBeGreaterThan(origin.lat);       // −z = 2000 → +north
+    expect(out.lon).toBeGreaterThan(origin.lon);       // +x = 1000 → +east
+  });
 });
 
 describe('ringSignedArea', () => {

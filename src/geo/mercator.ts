@@ -84,12 +84,15 @@ export class EnuFrame {
     return { x: east, z: -north };
   }
 
-  /** ENU (three.js x, z) → geographic (lat, lon). */
-  enuToGeo(x: number, z: number): GeoPoint {
-    return {
-      lat: this.origin.lat + (-z) / this.mPerDegLat,
-      lon: this.origin.lon + x / this.mPerDegLon,
-    };
+  /**
+   * ENU (three.js x, z) → geographic (lat, lon).
+   * Pass `out` to write into a preallocated object (zero-alloc hot path).
+   */
+  enuToGeo(x: number, z: number, out?: { lat: number; lon: number }): { lat: number; lon: number } {
+    const lat = this.origin.lat + (-z) / this.mPerDegLat;
+    const lon = this.origin.lon + x / this.mPerDegLon;
+    if (out) { out.lat = lat; out.lon = lon; return out; }
+    return { lat, lon };
   }
 }
 

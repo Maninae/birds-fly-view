@@ -13,6 +13,7 @@ import { BASE_CSS } from './styles/base';
 import { TITLE_CSS } from './styles/title';
 import { HUD_CSS } from './styles/hud';
 import { MODAL_CSS } from './styles/modal';
+import { MINIMAP_CSS } from './styles/minimap';
 
 const STYLE_ID = 'bfv-styles';
 
@@ -21,6 +22,6 @@ export function installStyles(): void {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = [BASE_CSS, TITLE_CSS, HUD_CSS, MODAL_CSS].join('\n');
+  style.textContent = [BASE_CSS, TITLE_CSS, HUD_CSS, MODAL_CSS, MINIMAP_CSS].join('\n');
   document.head.appendChild(style);
 }

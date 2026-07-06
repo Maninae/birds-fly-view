@@ -16,6 +16,7 @@ import { createLoading } from './loading';
 import { createToast } from './toast';
 import { createKeyModal } from './keyModal';
 import { createSearchButton } from './searchButton';
+import { createMinimap } from './minimap';
 
 export interface CreateUiOptions {
   container: HTMLElement;
@@ -40,6 +41,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
   const controlsHint = createControlsHint();
   const loading = createLoading();
   const toast = createToast();
+  const minimap = createMinimap();
 
   // Track whether we're currently in a flight state; the title veil behaves
   // differently mid-flight (translucent so the world drifts behind).
@@ -106,6 +108,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
     landing.root,
     controlsHint.root,
     searchButton.root,
+    minimap.root,
     title.root,
     loading.root,
     toast.root,
@@ -118,6 +121,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
       // Called at initial boot — cold start, not mid-flight.
       flying = false;
       openTitle(false);
+      minimap.setVisible(false);
     },
     hideTitle() {
       flying = true;
@@ -125,6 +129,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
       // First-flight hint fades in once the sky is visible.
       controlsHint.showOnce();
       hud.wake();
+      minimap.setVisible(true);
     },
     updateHud(state: HudState) {
       hud.update(state);
@@ -139,6 +144,9 @@ export function createUi(opts: CreateUiOptions): UiApi {
     },
     setError(msg) {
       toast.set(msg);
+    },
+    updateMap(lon: number, lat: number, headingDeg: number) {
+      minimap.update(lon, lat, headingDeg);
     },
   };
 }
