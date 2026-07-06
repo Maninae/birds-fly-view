@@ -16,6 +16,15 @@ import { GOOGLE_KEY_STORAGE } from '../config';
 import type { GeoPoint, UiApi, WorldKind, WorldSource } from '../types';
 import type { AppFactories } from './App';
 
+/** Stored Google key, or empty string when absent or storage is disabled. */
+function storedGoogleKey(): string {
+  try {
+    return localStorage.getItem(GOOGLE_KEY_STORAGE) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export interface SwitcherHooks {
   /**
    * Called the moment a world is constructed, BEFORE `init()` runs.
@@ -28,7 +37,9 @@ export interface SwitcherHooks {
 
 export class WorldSwitcher {
   private world: WorldSource | null = null;
-  private worldKind: WorldKind = 'dream';
+  // Photoreal is the default whenever a key is on hand (owner directive);
+  // dream is the no-signal fallback, and every photo failure degrades to it.
+  private worldKind: WorldKind = storedGoogleKey() ? 'photo' : 'dream';
   private lastOrigin: GeoPoint | null = null;
 
   /** Monotonic id bumped on every entry to a lifecycle operation. */
@@ -74,29 +85,41 @@ export class WorldSwitcher {
       }
 
       // Honor the requested WorldKind — if photo mode was armed before
-      // takeoff but the key is missing or the load fails, fall through to
-      // dream so the user still gets a world.
+      // takeoff but the key is missing, the module fails to load, or the
+      // tiles fail to init (bad key, quota, network), fall through to dream
+      // so the user still gets a world.
       const kindAtStart = this.worldKind;
       try {
         local = await this.buildForKind(kindAtStart);
-      } catch (photoErr) {
         if (this.gen !== myGen) {
-          // Stale before we even had something to dispose.
+          local.dispose();
           return null;
         }
-        console.warn('photoreal build failed at takeoff — falling back to dream', photoErr);
+        this.hooks.onBuilt(local);
+        this.scene.add(local.root);
+        await local.init(origin);
+      } catch (photoErr) {
+        if (this.gen !== myGen) {
+          // Stale — dispose our partial and let the newer op speak.
+          if (local) {
+            this.scene.remove(local.root);
+            local.dispose();
+          }
+          return null;
+        }
+        if (kindAtStart !== 'photo') throw photoErr;
+        console.warn('photoreal failed at takeoff — falling back to dream', photoErr);
         this.ui.setError('photoreal tiles didn’t load — flying dream instead.');
         this.worldKind = 'dream';
+        if (local) {
+          this.scene.remove(local.root);
+          local.dispose();
+        }
         local = this.factories.world();
+        this.hooks.onBuilt(local);
+        this.scene.add(local.root);
+        await local.init(origin);
       }
-      if (this.gen !== myGen) {
-        local.dispose();
-        return null;
-      }
-
-      this.hooks.onBuilt(local);
-      this.scene.add(local.root);
-      await local.init(origin);
       if (this.gen !== myGen) {
         this.scene.remove(local.root);
         local.dispose();
