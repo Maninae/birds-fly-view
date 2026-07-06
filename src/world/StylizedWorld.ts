@@ -28,6 +28,7 @@ import { COLOR_WATER } from './palette';
 import { TileStreamer } from './tileStreamer';
 import { buildTilePayload } from './tileBuilder';
 import { buildTerrainMesh } from './terrainMesh';
+import { disposeWindowTexture, windowTexture } from './windowTexture';
 
 /** Half-side of the ocean plane (m). Larger than fog radius; sits at y=0. */
 const OCEAN_HALF = 40_000;
@@ -64,9 +65,7 @@ export class StylizedWorld implements WorldSource {
   private greenMat: MeshLambertMaterial;
   private terrainMat: MeshLambertMaterial;
   private oceanMat: MeshLambertMaterial;
-
-  /** World-global party-wall dedupe (see tileBuilder + buildingMesh). */
-  private emittedEdges = new Set<string>();
+  private bridgeMat: MeshLambertMaterial;
 
   constructor() {
     this.root = new Group();
@@ -74,6 +73,11 @@ export class StylizedWorld implements WorldSource {
 
     this.buildingMat = new MeshLambertMaterial({
       vertexColors: true, flatShading: true,
+      // Procedural window grid: `.map` multiplies with vertexColor, so the
+      // texture darkens only the window rectangles and leaves the warm
+      // building color intact everywhere else. Shorter houses UV to a
+      // blank corner of the texture and stay clean.
+      map: windowTexture(),
     });
     this.roadMat = new MeshLambertMaterial({
       vertexColors: true, flatShading: true,
@@ -92,6 +96,9 @@ export class StylizedWorld implements WorldSource {
       vertexColors: true, flatShading: false,
     });
     this.oceanMat = new MeshLambertMaterial({ color: new Color(COLOR_WATER) });
+    this.bridgeMat = new MeshLambertMaterial({
+      vertexColors: true, flatShading: true,
+    });
 
     // Ocean plane under everything — catches gaps beyond loaded tiles.
     const ocean = new Mesh(new PlaneGeometry(OCEAN_HALF * 2, OCEAN_HALF * 2), this.oceanMat);
@@ -105,16 +112,18 @@ export class StylizedWorld implements WorldSource {
     this.terrainRoot.name = 'terrain-tiles';
     this.root.add(this.terrainRoot);
 
-    // Streamer builds meshes with our materials. The shared `emittedEdges`
-    // set makes party-wall dedupe world-global — walls that abut across
-    // tile seams only render once.
-    this.streamer = new TileStreamer((tile, tx, ty, tz, frame) =>
+    // Streamer owns the world-global wall-edge dedupe. It hands each
+    // tile builder an EdgeDedupe that writes to BOTH the global set
+    // (so seams dedupe cleanly) AND a per-tile set the streamer
+    // releases on eviction (so walls come back when neighbors reload).
+    this.streamer = new TileStreamer((tile, tx, ty, tz, frame, edges) =>
       buildTilePayload(tile, tx, ty, tz, frame, this.terrain, {
         buildingMat: this.buildingMat,
         roadMat: this.roadMat,
         waterMat: this.waterMat,
         greenMat: this.greenMat,
-      }, this.emittedEdges),
+        bridgeMat: this.bridgeMat,
+      }, edges),
     );
     this.root.add(this.streamer.root);
   }
@@ -124,7 +133,7 @@ export class StylizedWorld implements WorldSource {
     this.frame = new EnuFrame(origin);
     this.streamer.setFrame(this.frame);
     // New anchor origin invalidates every cached wall-edge key.
-    this.emittedEdges.clear();
+    this.streamer.resetEdges();
 
     // Fetch the vector-tile template + pre-load terrain around the takeoff
     // point BEFORE resolving so buildings can drape correctly on spawn.
@@ -219,7 +228,6 @@ export class StylizedWorld implements WorldSource {
     this.disposed = true;
     this.streamer.dispose();
     this.terrain.dispose();
-    this.emittedEdges.clear();
     for (const mesh of this.terrainTiles.values()) mesh.geometry.dispose();
     this.terrainTiles.clear();
     // Drop the ocean plane's geometry too — its material is in the field list.
@@ -227,12 +235,14 @@ export class StylizedWorld implements WorldSource {
       const g = (n as { geometry?: { dispose?: () => void } }).geometry;
       if (g && n.name === 'ocean-plane') g.dispose?.();
     });
+    disposeWindowTexture();
     this.buildingMat.dispose();
     this.roadMat.dispose();
     this.waterMat.dispose();
     this.greenMat.dispose();
     this.terrainMat.dispose();
     this.oceanMat.dispose();
+    this.bridgeMat.dispose();
   }
 
   /** Test-only: check that `started` flipped once init resolved. */

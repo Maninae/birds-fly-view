@@ -29,8 +29,19 @@ const CONCURRENCY = 6;
 /** Absolute cap on loaded tiles (LRU beyond this). */
 const MAX_TILES = 50;
 
+/**
+ * Duck-typed dedupe surface — buildingMesh calls `.has` and `.add` on this.
+ * A plain `Set<string>` satisfies it; the streamer wraps one so writes ALSO
+ * accumulate into a per-tile Set for eviction.
+ */
+export interface EdgeDedupe {
+  has(k: string): boolean;
+  add(k: string): unknown;
+}
+
 export type TileBuilder = (
   tile: VectorTile, tx: number, ty: number, tz: number, frame: EnuFrame,
+  edges: EdgeDedupe,
 ) => Object3D | null;
 
 interface TileEntry {
@@ -40,6 +51,8 @@ interface TileEntry {
   root: Group;                   // parented under streamer.root; holds tile meshes
   lastSeen: number;              // clock at last "in the wanted ring" check
   tilePromise?: Promise<VectorTile | null>;
+  /** Wall-edge dedupe keys this tile added — released on evict. */
+  wallEdges?: Set<string>;
 }
 
 export class TileStreamer {
@@ -54,6 +67,15 @@ export class TileStreamer {
   private builder: TileBuilder;
   private templateP: Promise<string> | null = null;
   private disposed = false;
+  /**
+   * World-global wall-edge dedupe keys. Kept on the streamer so we can
+   * SUBTRACT a tile's per-tile keys on eviction — otherwise the global
+   * Set grows forever, evicted tiles leave stale claims behind, and any
+   * neighbor (or re-loaded copy) reads every wall edge as "already
+   * emitted" → walls silently disappear. This is the FiDi-blank-buildings
+   * bug the tester surfaced.
+   */
+  private globalEdges = new Set<string>();
 
   constructor(builder: TileBuilder) {
     this.root = new Group();
@@ -62,6 +84,9 @@ export class TileStreamer {
   }
 
   setFrame(frame: EnuFrame): void { this.frame = frame; }
+
+  /** Clear the world-global wall-edge dedupe — used on re-anchor. */
+  resetEdges(): void { this.globalEdges.clear(); }
 
   /** Precompute the URL template so init doesn't stall on the first tile. */
   primeTemplate(): Promise<void> {
@@ -145,6 +170,7 @@ export class TileStreamer {
     this.root.clear();
     this.queued.length = 0;
     this.buildQueue.length = 0;
+    this.globalEdges.clear();
   }
 
   // ── Internal ─────────────────────────────────────────────────────────────
@@ -180,7 +206,17 @@ export class TileStreamer {
     this.buildQueue.push(async () => {
       if (this.disposed || !this.frame) return;
       try {
-        const obj = this.builder(tile, entry.tx, entry.ty, this.tz, this.frame);
+        // Per-tile wall-edge log so we can release the tile's claims on
+        // eviction. The dedupe object writes to BOTH the global Set (for
+        // O(1) neighbor-tile dedupe) AND this per-tile Set (for release).
+        const wallEdges = new Set<string>();
+        const global = this.globalEdges;
+        const dedupe: EdgeDedupe = {
+          has: (k) => global.has(k),
+          add: (k) => { global.add(k); wallEdges.add(k); return dedupe; },
+        };
+        entry.wallEdges = wallEdges;
+        const obj = this.builder(tile, entry.tx, entry.ty, this.tz, this.frame, dedupe);
         if (obj) entry.root.add(obj);
         entry.state = 'ready';
       } catch {
@@ -190,6 +226,12 @@ export class TileStreamer {
   }
 
   private evictTile(k: string, entry: TileEntry): void {
+    // Release this tile's wall-edge dedupe claims before disposing. If we
+    // skip this, neighboring tiles that re-emit the same wall on re-load
+    // will find the key still "taken" and silently drop the wall.
+    if (entry.wallEdges) {
+      for (const key of entry.wallEdges) this.globalEdges.delete(key);
+    }
     this.disposeSubtree(entry.root);
     this.root.remove(entry.root);
     this.tiles.delete(k);

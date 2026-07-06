@@ -13,7 +13,9 @@ import {
 import type { VectorTile } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
+import type { EdgeDedupe } from './tileStreamer';
 import { buildBuildingBuffers } from './buildingMesh';
+import { buildBridgeBuffers } from './bridges';
 import {
   buildRoadBuffers, buildWaterBuffers, buildGreenBuffers,
 } from './surfaceMesh';
@@ -24,15 +26,19 @@ export interface TileMaterials {
   roadMat: MeshLambertMaterial;
   waterMat: MeshPhongMaterial;
   greenMat: MeshLambertMaterial;
+  bridgeMat: MeshLambertMaterial;
 }
 
 /**
  * Build all merged surface meshes for one tile.
  *
- * `emittedEdges` is coordinator-owned so wall-edge dedupe is world-global.
- * A building whose east wall butts up against a building in the neighboring
- * tile will only render that wall once — even though each tile's MVT data
- * carries its own copy of the edge.
+ * `edges` is the streamer-provided EdgeDedupe: writes go to BOTH a
+ * world-global Set (so wall-edge dedupe crosses tile seams) AND a
+ * per-tile Set (so eviction can release this tile's claims). Under this
+ * lifecycle, a building whose east wall butts up against a building in
+ * the neighboring tile only renders that wall once, AND if the emitting
+ * tile evicts later, the neighbor can re-render its side without the
+ * key being stuck "already taken".
  *
  * Returns null if the tile has no drawable content.
  */
@@ -42,7 +48,7 @@ export function buildTilePayload(
   frame: EnuFrame,
   terrain: TerrainSampler,
   mats: TileMaterials,
-  emittedEdges: Set<string>,
+  edges: EdgeDedupe,
 ): Group | null {
   const g = new Group();
   g.name = `tile-content ${tx}/${ty}`;
@@ -58,7 +64,7 @@ export function buildTilePayload(
   // WorldSource restrict `groundBelow`'s raycast to just these meshes,
   // so trees/roads/water/greens never register as "perchable rooftops".
   if (building) {
-    const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain, emittedEdges);
+    const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain, edges);
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.buildingMat);
       mesh.name = 'buildings';
@@ -98,8 +104,21 @@ export function buildTilePayload(
     }
   }
 
-  // Trees — sparse instances inside parks/wood polygons.
-  const trees = buildTreeInstances({ park, landcover }, tx, ty, tz, frame, terrain);
+  // Bridges — decks + railings + support piers, elevated per span/terrain.
+  // Bay Bridge, Golden Gate, and every overpass. Emitted after roads so
+  // draw order is stable.
+  if (transportation) {
+    const data = buildBridgeBuffers(transportation, tx, ty, tz, frame, terrain);
+    if (data) {
+      const mesh = new Mesh(makeGeometry(data), mats.bridgeMat);
+      mesh.name = 'bridges';
+      g.add(mesh);
+    }
+  }
+
+  // Trees — sparse instances inside parks/wood polygons AND lining
+  // residential/minor streets (Bay Area is a tree-lined city).
+  const trees = buildTreeInstances({ park, landcover, transportation }, tx, ty, tz, frame, terrain);
   if (trees) { trees.name = 'trees'; g.add(trees); }
 
   return g.children.length ? g : null;
@@ -108,12 +127,13 @@ export function buildTilePayload(
 /** Common: attach the pre-packed typed arrays to a fresh BufferGeometry. */
 function makeGeometry(data: {
   positions: Float32Array; normals: Float32Array; colors: Float32Array;
-  indices: Uint32Array | Uint16Array;
+  uvs?: Float32Array; indices: Uint32Array | Uint16Array;
 }): BufferGeometry {
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(data.positions, 3));
   g.setAttribute('normal', new BufferAttribute(data.normals, 3));
   g.setAttribute('color', new BufferAttribute(data.colors, 3));
+  if (data.uvs) g.setAttribute('uv', new BufferAttribute(data.uvs, 2));
   g.setIndex(new BufferAttribute(data.indices, 1));
   g.computeBoundingSphere();
   return g;

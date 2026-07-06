@@ -15,8 +15,10 @@ import type { VectorTileLayer } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import {
+  clipPolylineToTileBox,
   extractPolygons, featureAnchorInTile, pointInRing, ringBounds,
 } from './geometryUtils';
+import { projectTileRingToEnu2 } from '../geo/mercator';
 import { TREE_CANOPY_A, TREE_CANOPY_B, TREE_TRUNK, hash32 } from './palette';
 
 /** Rough target — one tree per this many m² of park polygon area (bbox proxy). */
@@ -126,7 +128,15 @@ function treeMaterial(): MeshLambertMaterial {
  * Returns null if there's nothing to place.
  */
 export function buildTreeInstances(
-  layers: { park?: VectorTileLayer; landcover?: VectorTileLayer },
+  layers: {
+    park?: VectorTileLayer;
+    landcover?: VectorTileLayer;
+    /**
+     * Transportation layer — used to scatter street trees along
+     * residential-scale ways (a big chunk of Bay Area's Google-Maps look).
+     */
+    transportation?: VectorTileLayer;
+  },
   tileX: number, tileY: number, tileZ: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
@@ -145,7 +155,10 @@ export function buildTreeInstances(
   };
   collect(layers.park);
   collect(layers.landcover, (c) => c === 'wood' || c === 'grass');
-  if (!rings.length) return null;
+  // Street-tree polylines (residential / minor / service). Kept
+  // separate from park rings because we scatter along them, not inside.
+  const streetLines = collectStreetLines(layers.transportation, tileX, tileY, tileZ, frame);
+  if (!rings.length && !streetLines.length) return null;
 
   const seed0 = hash32(tileX, tileY, tileZ);
   const transforms: Matrix4[] = [];
@@ -153,6 +166,14 @@ export function buildTreeInstances(
   const _yRot = new Matrix4();
 
   let seed = seed0;
+  // Street trees first — cheap and evenly spaced. Cap the total instance
+  // count so a very dense grid can't blow past `MAX_INSTANCES_PER_TILE`.
+  seed = scatterStreetTrees(streetLines, transforms, m, _yRot, seed, frame, terrain);
+  if (transforms.length >= MAX_INSTANCES_PER_TILE) {
+    // Skip park scatter — street trees already saturated the budget.
+    return buildInstancedMesh(transforms);
+  }
+
   outer: for (const ring of rings) {
     const bb = ringBounds(ring);
     const area = Math.max(0, (bb.maxX - bb.minX) * (bb.maxZ - bb.minZ));
@@ -182,8 +203,105 @@ export function buildTreeInstances(
     }
   }
 
-  if (!transforms.length) return null;
+  return buildInstancedMesh(transforms);
+}
 
+/** Classes of way we'll line with street trees. */
+const STREET_TREE_CLASSES = new Set(['residential', 'minor', 'service']);
+/** Spacing between street trees along a way (m). Jittered per placement. */
+const STREET_TREE_SPACING_M = 24;
+/** Perpendicular offset from the way's centerline to the tree trunk (m). */
+const STREET_TREE_SIDE_OFFSET_M = 5;
+
+interface StreetLine { pts: Vector2[]; }
+
+/** Extract tile-interior residential/minor polylines, projected into ENU. */
+function collectStreetLines(
+  layer: VectorTileLayer | undefined,
+  tileX: number, tileY: number, tileZ: number,
+  frame: import('../geo/mercator').EnuFrame,
+): StreetLine[] {
+  if (!layer) return [];
+  const out: StreetLine[] = [];
+  for (let i = 0; i < layer.length; i++) {
+    const f = layer.feature(i);
+    const props = f.properties as Record<string, string | number>;
+    const cls = String(props.class ?? '');
+    if (!STREET_TREE_CLASSES.has(cls)) continue;
+    if (props.brunnel === 'tunnel' || props.brunnel === 'bridge') continue;
+    const rings = f.loadGeometry();
+    for (const ring of rings) {
+      if (ring.length < 2) continue;
+      for (const sub of clipPolylineToTileBox(ring, f.extent)) {
+        const proj = projectTileRingToEnu2(sub, tileX, tileY, tileZ, f.extent, frame);
+        if (proj.length >= 2) out.push({ pts: proj });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Walk each street polyline and place trees at ~STREET_TREE_SPACING_M
+ * along it, offset perpendicular to the centerline. Returns the updated
+ * PRNG seed so the caller can chain into park scatter deterministically.
+ */
+function scatterStreetTrees(
+  lines: StreetLine[],
+  transforms: Matrix4[],
+  m: Matrix4,
+  _yRot: Matrix4,
+  seed: number,
+  frame: import('../geo/mercator').EnuFrame,
+  terrain: TerrainSampler,
+): number {
+  for (const line of lines) {
+    // Cumulative arc length so we can drop trees at exact spacing.
+    const pts = line.pts;
+    let carry = 0; // distance since last placement
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const dx = b.x - a.x, dz = b.y - a.y;
+      const seg = Math.hypot(dx, dz);
+      if (seg < 1e-3) continue;
+      // Unit tangent + normal (perpendicular in XZ, rotate 90° CCW).
+      const tx = dx / seg, tz = dz / seg;
+      const nx = -tz, nz = tx;
+      // Walk along the segment placing trees whenever cumulative
+      // reaches spacing (with per-tree jitter to break the grid).
+      let t = -carry;
+      while (t + STREET_TREE_SPACING_M < seg + carry) {
+        t += STREET_TREE_SPACING_M;
+        seed = (Math.imul(seed, 0x27d4eb2d) + 0x9e3779b9) >>> 0;
+        const jitterAlong = ((seed / 0x100000000) - 0.5) * 8; // ±4 m
+        seed = (Math.imul(seed, 0x27d4eb2d) + 0x9e3779b9) >>> 0;
+        const sideBias = (seed & 1) === 0 ? +1 : -1;
+        seed = (Math.imul(seed, 0x27d4eb2d) + 0x9e3779b9) >>> 0;
+        const offset = STREET_TREE_SIDE_OFFSET_M + ((seed / 0x100000000) - 0.5) * 2;
+        const along = Math.max(0, Math.min(seg, t + jitterAlong));
+        const px = a.x + tx * along + nx * offset * sideBias;
+        const pz = a.y + tz * along + nz * offset * sideBias;
+        const geo = frame.enuToGeo(px, pz);
+        const py = terrain.sample(geo.lat, geo.lon);
+        seed = (Math.imul(seed, 0x27d4eb2d) + 0x9e3779b9) >>> 0;
+        const scale = 0.65 + (seed / 0x100000000) * 0.35; // slightly smaller than park trees
+        seed = (Math.imul(seed, 0x27d4eb2d) + 0x9e3779b9) >>> 0;
+        const rot = (seed / 0x100000000) * Math.PI * 2;
+        m.makeScale(scale, scale, scale);
+        m.multiply(_yRot.makeRotationY(rot));
+        m.setPosition(px, py, pz);
+        transforms.push(m.clone());
+        if (transforms.length >= MAX_INSTANCES_PER_TILE) return seed;
+      }
+      carry = (carry + seg) % STREET_TREE_SPACING_M;
+    }
+  }
+  return seed;
+}
+
+/** Package the accumulated transforms into an InstancedMesh (or null). */
+function buildInstancedMesh(transforms: readonly Matrix4[]): InstancedMesh | null {
+  if (!transforms.length) return null;
   const mesh = new InstancedMesh(treeGeometry(), treeMaterial(), transforms.length);
   for (let i = 0; i < transforms.length; i++) mesh.setMatrixAt(i, transforms[i]);
   mesh.instanceMatrix.needsUpdate = true;

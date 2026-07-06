@@ -26,14 +26,34 @@ import {
 import {
   WALL_SHADE, WALL_BASE_SHADE, hash32, pickBuildingColor,
 } from './palette';
+import type { EdgeDedupe } from './tileStreamer';
+import { WINDOW_PITCH_H_M, WINDOW_PITCH_V_M } from './windowTexture';
+
+/**
+ * Buildings taller than this get window UVs computed from world position;
+ * shorter houses get UV=(0,0) so they sample the texture's blank corner
+ * and stay clean.
+ */
+const WINDOW_MIN_HEIGHT_M = 9;
 
 /** Extra sink so building bases don't leave gaps on gentle slopes. */
 const BASE_SINK_M = 3;
+
+/**
+ * Terrain elevations at or below this read as "under water" for the
+ * building-over-water skip: bridge piers, marine buoys, and mid-Bay dock
+ * features are all encoded as `building` in OpenStreetMap and were being
+ * extruded into free-floating pylons and slab walls across the Bay. This
+ * threshold matches `WATER_ELEVATION_THRESHOLD_M` in StylizedWorld —
+ * anything at or below is treated as water and its buildings are dropped.
+ */
+const WATER_ELEV_SKIP_M = 0.4;
 
 export interface BuildingBufferData {
   positions: Float32Array;
   normals: Float32Array;
   colors: Float32Array;
+  uvs: Float32Array;
   indices: Uint32Array | Uint16Array;
 }
 
@@ -47,13 +67,14 @@ export function buildBuildingBuffers(
   frame: EnuFrame,
   terrain: TerrainSampler,
   /**
-   * Shared across tiles (coordinator-owned). MVT features spilling into a
-   * neighboring tile's buffer that both tiles happen to accept — plus rare
-   * cases where two adjacent features from DIFFERENT tiles align on a
-   * shared world-XZ edge — get skipped on the second sighting. Without
-   * this, buildings at tile seams z-fight visibly.
+   * Streamer-provided EdgeDedupe. `.has()` reads the world-global claim
+   * set (so neighboring tiles' shared walls dedupe cleanly); `.add()`
+   * writes to BOTH the global set and a per-tile set the streamer
+   * releases on eviction. Without the release step, evicted tiles leave
+   * their edge keys stuck as "already claimed" and re-loaded neighbors
+   * silently skip every wall — that's the FiDi-blank-buildings bug.
    */
-  emittedEdges: Set<string>,
+  edges: EdgeDedupe,
 ): BuildingBufferData | null {
   // Emit walls into their own array first (every quad is exactly 4 verts,
   // so the whole wall section is naturally 4-aligned) and roofs into a
@@ -65,17 +86,19 @@ export function buildBuildingBuffers(
   const wallPos: number[] = [];
   const wallNor: number[] = [];
   const wallCol: number[] = [];
+  const wallUv: number[] = [];
   const wallIdx: number[] = [];
   const roofPos: number[] = [];
   const roofNor: number[] = [];
   const roofCol: number[] = [];
+  const roofUv: number[] = [];
   const roofIdx: number[] = [];
 
   const jitterColor = new Color();
   const roofC = { r: 0, g: 0, b: 0 };
   const wallC = { r: 0, g: 0, b: 0 };
   const wallBaseC = { r: 0, g: 0, b: 0 };
-  // Party-wall dedupe: `emittedEdges` is coordinator-owned (see param
+  // Party-wall dedupe: `edges` is coordinator-owned (see param
   // docs) so neighboring OSM buildings that abut across a tile boundary
   // dedupe just like they do inside a single tile.
 
@@ -111,6 +134,15 @@ export function buildBuildingBuffers(
         terrain.sample(gLoHi.lat, gLoHi.lon),
         terrain.sample(gHiLo.lat, gHiLo.lon),
       );
+      // Skip anything whose footprint sits over water. OpenStreetMap encodes
+      // bridge piers, suspension towers, buoys, and mid-Bay marine
+      // structures as `building`, which the extruder turned into
+      // free-standing pylons and colossal walls across the Bay. Use the
+      // CENTROID sample (not the max across corners) so buildings whose
+      // centroid is over water are dropped even if a corner touches the
+      // shallow bathymetric shelf. Bridge decks + suspension are drawn
+      // separately in `bridges.ts`.
+      if (centroidY <= WATER_ELEV_SKIP_M) continue;
       const baseY = minGroundY - BASE_SINK_M + heights.base;
       const topY = centroidY + heights.height;
 
@@ -132,12 +164,18 @@ export function buildBuildingBuffers(
       // Walls → wall buffers (naturally 4-aligned).
       // Party-wall dedupe here removes shared edges between neighboring OSM
       // buildings before we ever push their vertices.
-      emitWalls(poly.outer, baseY, topY, wallC, wallBaseC, wallPos, wallNor, wallCol, wallIdx, false, emittedEdges);
+      const wantWindows = (topY - baseY) >= WINDOW_MIN_HEIGHT_M;
+      emitWalls(poly.outer, baseY, topY, wallC, wallBaseC, wallPos, wallNor, wallCol, wallUv, wallIdx, false, edges, wantWindows);
       for (const hole of poly.holes) {
-        emitWalls(hole, baseY, topY, wallC, wallBaseC, wallPos, wallNor, wallCol, wallIdx, true, emittedEdges);
+        emitWalls(hole, baseY, topY, wallC, wallBaseC, wallPos, wallNor, wallCol, wallUv, wallIdx, true, edges, wantWindows);
       }
       // Roof (flat-triangulated, up-facing) → roof buffers (variable size).
+      // Every roof vert samples the texture's blank corner (UV 0,0), so the
+      // window pattern only ever shows on the walls.
+      const roofVertsBefore = roofPos.length / 3;
       appendPolygonFlat(poly, topY, roofC, roofPos, roofNor, roofCol, roofIdx);
+      const roofVertsAdded = roofPos.length / 3 - roofVertsBefore;
+      for (let k = 0; k < roofVertsAdded; k++) roofUv.push(0, 0);
       count++;
     }
   }
@@ -151,9 +189,11 @@ export function buildBuildingBuffers(
   const positions = new Float32Array(wallPos.length + roofPos.length);
   const normals = new Float32Array(wallNor.length + roofNor.length);
   const colors = new Float32Array(wallCol.length + roofCol.length);
+  const uvs = new Float32Array(wallUv.length + roofUv.length);
   positions.set(wallPos, 0);            positions.set(roofPos, wallPos.length);
   normals.set(wallNor, 0);              normals.set(roofNor, wallNor.length);
   colors.set(wallCol, 0);               colors.set(roofCol, wallCol.length);
+  uvs.set(wallUv, 0);                   uvs.set(roofUv, wallUv.length);
   const totalIndices = wallIdx.length + roofIdx.length;
   const totalVerts = wallVerts + roofPos.length / 3;
   const indices: Uint32Array | Uint16Array =
@@ -161,7 +201,7 @@ export function buildBuildingBuffers(
   for (let i = 0; i < wallIdx.length; i++) indices[i] = wallIdx[i];
   for (let i = 0; i < roofIdx.length; i++) indices[wallIdx.length + i] = roofIdx[i] + wallVerts;
 
-  return { positions, normals, colors, indices };
+  return { positions, normals, colors, uvs, indices };
 }
 
 /**
@@ -189,12 +229,18 @@ function emitWalls(
   positions: number[],
   normals: number[],
   colors: number[],
+  uvs: number[],
   indices: number[],
   isHole: boolean,
-  emittedEdges: Set<string>,
+  edges: EdgeDedupe,
+  wantWindows: boolean,
 ): void {
   const n = ring.length;
   const sign = isHole ? -1 : 1;
+  // Cumulative arc length around the ring (world meters). Windows tile
+  // continuously per wall, but reset per ring — a hole and the outer
+  // ring don't share their U counter.
+  let cumU = 0;
   for (let i = 0; i < n; i++) {
     const a = ring[i];
     const b = ring[(i + 1) % n];
@@ -211,8 +257,11 @@ function emitWalls(
     const ka = `${Math.round(a.x * 4)},${Math.round(a.y * 4)}`;
     const kb = `${Math.round(b.x * 4)},${Math.round(b.y * 4)}`;
     const edgeKey = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-    if (emittedEdges.has(edgeKey)) continue;
-    emittedEdges.add(edgeKey);
+    if (edges.has(edgeKey)) {
+      cumU += len;
+      continue;
+    }
+    edges.add(edgeKey);
 
     // Outward for canonical CCW outer is (-tz, tx); flip for CW hole.
     const nxo = (-tz / len) * sign;
@@ -230,6 +279,24 @@ function emitWalls(
     colors.push(wallBaseC.r, wallBaseC.g, wallBaseC.b);
     colors.push(wallC.r,     wallC.g,     wallC.b);
     colors.push(wallC.r,     wallC.g,     wallC.b);
+
+    // Window UVs. Tall buildings: world-space tile so windows align across
+    // the wall (u along the wall in `WINDOW_PITCH_H_M` units, v by height).
+    // Short buildings: all four verts at UV (0, 0) — the texture's blank
+    // corner cell — so no window pattern shows.
+    if (wantWindows) {
+      const u0 = cumU / WINDOW_PITCH_H_M;
+      const u1 = (cumU + len) / WINDOW_PITCH_H_M;
+      const v0 = baseY / WINDOW_PITCH_V_M;
+      const v1 = topY / WINDOW_PITCH_V_M;
+      uvs.push(u0, v0);
+      uvs.push(u1, v0);
+      uvs.push(u0, v1);
+      uvs.push(u1, v1);
+    } else {
+      for (let k = 0; k < 4; k++) uvs.push(0, 0);
+    }
+    cumU += len;
 
     // Winding orientation matches the stored normal so lighting and
     // back-face culling agree — no more one-sided see-through walls.

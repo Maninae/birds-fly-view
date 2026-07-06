@@ -29,6 +29,33 @@ export const COLOR_GRASS = new Color('#A6C084');
 export const COLOR_SAND = new Color('#E8D8A8');
 export const COLOR_WETLAND = new Color('#8FAE8A');
 
+// ── Road lane markings ─────────────────────────────────────────────────────
+// Warm cream centerlines/edge lines that read as painted stripes at bird
+// height without competing with the road tone. Motorway edge lines are a
+// touch brighter than centerlines so freeways still read as distinct.
+export const LANE_CENTER = new Color('#F7EAC7');
+export const LANE_MOTORWAY_EDGE = new Color('#FFF3D8');
+
+// ── Landuse tint patches (Google-Maps-style patchwork) ─────────────────────
+// Subtle ±10-15% shifts from the sage base green so residential vs.
+// commercial vs. industrial reads as a soft neighborhood grain at bird
+// altitude — not a checkerboard.
+export const LANDUSE_RESIDENTIAL = new Color('#B7B98A'); // warm sand-green
+export const LANDUSE_COMMERCIAL = new Color('#C7C29F'); // pale cream over sage
+export const LANDUSE_RETAIL = new Color('#C9C6A5');
+export const LANDUSE_INDUSTRIAL = new Color('#9CA79A'); // cool gray-tan
+export const LANDUSE_SCHOOL = new Color('#AFB58C');     // soft khaki
+export const LANDUSE_HOSPITAL = new Color('#B3B296');
+export const LANDUSE_CEMETERY = new Color('#96A57F');
+
+// ── Bridges ────────────────────────────────────────────────────────────────
+// Chunky, cel-shaded. Deck slightly warmer than the roads it replaces so
+// bridges read as their own object from bird height.
+export const BRIDGE_DECK = new Color('#CDAA83');
+export const BRIDGE_DECK_UNDER = new Color('#8A6E4F'); // shaded underside
+export const BRIDGE_PIER = new Color('#7F6952');
+export const BRIDGE_RAILING = new Color('#5D4A38');
+
 // ── Roads ──────────────────────────────────────────────────────────────────
 // Motorway is unmistakable from the air. Path/rail are quiet.
 export const ROAD_COLORS: Record<string, Color> = {
