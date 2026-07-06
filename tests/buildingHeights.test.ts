@@ -2,7 +2,7 @@
  * parseBuildingHeights: verify default + clamp + hide_3d behavior.
  */
 import { describe, expect, it } from 'vitest';
-import { parseBuildingHeights } from '../src/world/buildingHeights';
+import { parseBuildingHeights, sanityCheckHeight } from '../src/world/buildingHeights';
 
 describe('parseBuildingHeights', () => {
   it('reads render_height and render_min_height', () => {
@@ -47,5 +47,35 @@ describe('parseBuildingHeights', () => {
     const h = parseBuildingHeights({ render_height: 30, render_min_height: 25 });
     expect(h!.height).toBe(30);
     expect(h!.base).toBe(25);
+  });
+});
+
+describe('sanityCheckHeight (footprint-aware clamp)', () => {
+  it('passes normal buildings through unchanged', () => {
+    expect(sanityCheckHeight(30, 400)).toBe(30);   // 4-story house
+    expect(sanityCheckHeight(120, 3000)).toBe(120); // downtown mid-rise
+    expect(sanityCheckHeight(326, 4000)).toBe(326); // Salesforce Tower
+  });
+
+  it('kills OSM > 400 m rows to the default', () => {
+    expect(sanityCheckHeight(1200, 500)).toBe(5);
+    expect(sanityCheckHeight(999, 2000)).toBe(5);
+  });
+
+  it('kills SPIKE towers (>150 m on tiny footprint)', () => {
+    // 200 m tall on a 40 m² footprint = bad OSM row for a pole/antenna.
+    expect(sanityCheckHeight(200, 40)).toBe(5);
+    expect(sanityCheckHeight(180, 90)).toBe(5);
+  });
+
+  it('caps SLAB extrusions (>50 m on >25 000 m² footprint)', () => {
+    // Bad OSM: 60 m over a 3-block "building" — misrouted or dirty tagging.
+    expect(sanityCheckHeight(60, 30000)).toBeLessThanOrEqual(20);
+    expect(sanityCheckHeight(100, 60000)).toBeLessThanOrEqual(20);
+  });
+
+  it('leaves legitimate warehouses under 50 m alone', () => {
+    // Costco-style big-box: 15 m tall, 40 000 m². Nothing bogus about it.
+    expect(sanityCheckHeight(15, 40000)).toBe(15);
   });
 });

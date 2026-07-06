@@ -29,6 +29,15 @@ const WATER_Y = 0.5;         // sea level, near y=0 ocean plane
 const GREEN_DRAPE = 0.15;    // slightly above terrain, under roads
 const LANDUSE_DRAPE = 0.12;  // just below greens so parks paint on top
 
+/**
+ * Threshold for suppressing landcover/park polygons that shelve out
+ * over water. OSM tags Yerba Buena's beach and Marina Green edges as
+ * `sand`/`grass`, and when their polygons extend past the shoreline the
+ * bathymetric shelf paints a tan/green slab over the Bay. Sample terrain
+ * at the centroid; if under this height, drop the feature entirely.
+ */
+const GREEN_WATER_SKIP_M = 0.6;
+
 /** Which road classes get a painted centerline. */
 const LANE_CENTER_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary']);
 /** Centerline half-widths per class (m). */
@@ -238,11 +247,16 @@ export function buildGreenBuffers(
     if (!featureAnchorInTile(feat)) return; // dedupe tile-buffer overlap
     const polys = extractPolygons(feat, tileX, tileY, tileZ, frame);
     for (const poly of polys) {
-      // Sample Y at centroid — polygon is small enough to look flat.
+      // Sample terrain at centroid + bbox corners: skip if ANY sample
+      // is over water. A beach polygon that extends past the shoreline
+      // still gets stamped with the neighborhood-tint centroid test,
+      // which was letting Yerba Buena's sand slab paint the Bay.
+      if (touchesWater(poly, frame, terrain)) continue;
+      // Draping Y at centroid — polygon is small enough to look flat.
       const c = ringCentroid(poly.outer);
       const geo = frame.enuToGeo(c.x, c.z);
-      const y = terrain.sample(geo.lat, geo.lon) + GREEN_DRAPE;
-      appendPolygonFlat(poly, y, color, positions, normals, colors, indices);
+      const groundY = terrain.sample(geo.lat, geo.lon);
+      appendPolygonFlat(poly, groundY + GREEN_DRAPE, color, positions, normals, colors, indices);
       hit++;
     }
   };
@@ -281,12 +295,15 @@ export function buildGreenBuffers(
   if (park) for (let i = 0; i < park.length; i++) stamp(park.feature(i), COLOR_PARK);
 
   // Locally-scoped helper matching `stamp` but with a custom drape offset
-  // so landuse patches paint below the greens layer.
+  // so landuse patches paint below the greens layer. Same water-touch
+  // rule as stamp() — landuse polygons ("residential", "commercial")
+  // that shelve into the Bay would paint an obvious tint slab over water.
   function stampAt(feat: VectorTileFeature, color: Color, offset: number): void {
     if (feat.type !== 3) return;
     if (!featureAnchorInTile(feat)) return;
     const polys = extractPolygons(feat, tileX, tileY, tileZ, frame);
     for (const poly of polys) {
+      if (touchesWater(poly, frame, terrain)) continue;
       const c = ringCentroid(poly.outer);
       const geo = frame.enuToGeo(c.x, c.z);
       const y = terrain.sample(geo.lat, geo.lon) + offset;
@@ -302,6 +319,37 @@ export function buildGreenBuffers(
     colors: new Float32Array(colors),
     indices: positions.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices),
   };
+}
+
+/**
+ * Does any sample of this polygon's footprint sit over water? Samples
+ * centroid + four bbox corners; if any of the five is at or below the
+ * water threshold, the whole polygon is dropped. Aggressive on purpose:
+ * a beach polygon that overlaps the Bay is better cut than draping a
+ * tan slab across the water.
+ */
+function touchesWater(
+  poly: { outer: import('three').Vector2[] },
+  frame: EnuFrame,
+  terrain: TerrainSampler,
+): boolean {
+  const outer = poly.outer;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let sx = 0, sy = 0;
+  for (const p of outer) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    sx += p.x; sy += p.y;
+  }
+  const cx = sx / outer.length, cz = sy / outer.length;
+  const points: Array<[number, number]> = [
+    [cx, cz], [minX, minY], [maxX, minY], [minX, maxY], [maxX, maxY],
+  ];
+  for (const [x, z] of points) {
+    const g = frame.enuToGeo(x, z);
+    if (terrain.sample(g.lat, g.lon) <= GREEN_WATER_SKIP_M) return true;
+  }
+  return false;
 }
 
 /** Map an OpenMapTiles landuse class to a subtle tint color. */

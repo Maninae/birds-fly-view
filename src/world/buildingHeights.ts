@@ -19,6 +19,28 @@ export interface BuildingHeights {
 const DEFAULT_HEIGHT_M = 5;
 const MAX_HEIGHT_M = 500; // clamp obvious data errors (a Bay Area building > 500 m is a bug)
 
+/**
+ * OSM occasionally carries height rows an order of magnitude too tall
+ * (e.g. a fence line tagged 1200 m). We apply footprint-aware sanity so
+ * a single bad row doesn't extrude a kilometer-tall sliver over SoMa or
+ * a multi-block slab over the Sunset:
+ *
+ *   • height > 400 m: default height (5 m). No Bay Area building is
+ *     that tall — even Salesforce Tower is 326 m.
+ *   • height > 150 m AND footprint area < 100 m²: default (5 m). Real
+ *     150 m+ towers have footprints in the 1500–5000 m² range.
+ *   • height > 50 m AND footprint area > 25 000 m² (≈ 160 m × 160 m):
+ *     clamp to 20 m. Genuine 50 m warehouses/malls exist but never at
+ *     that scale in OSM without other tagging — a bad row is far more
+ *     likely than a 60 m six-block warehouse.
+ */
+export function sanityCheckHeight(rawHeight: number, footprintAreaM2: number): number {
+  if (rawHeight > 400) return DEFAULT_HEIGHT_M;
+  if (rawHeight > 150 && footprintAreaM2 < 100) return DEFAULT_HEIGHT_M;
+  if (rawHeight > 50 && footprintAreaM2 > 25000) return Math.min(rawHeight, 20);
+  return rawHeight;
+}
+
 export function parseBuildingHeights(
   props: Record<string, unknown>,
 ): BuildingHeights | null {

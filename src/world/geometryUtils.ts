@@ -112,53 +112,52 @@ export function appendPolygonFlat(
   const faces = ShapeUtils.triangulateShape(poly.outer, poly.holes);
   if (!faces.length) return;
 
-  // Winding safety net — probe one triangle and flip all if the geometric
-  // normal points down. Under the canonical convention this never fires,
-  // but a degenerate outer or a self-touching ring can still slip Earcut.
-  const flip = firstTriangleFacesDown(faces, poly, y);
-
+  // Winding safety net — per-triangle. Under the canonical convention
+  // every Earcut output faces +Y, but a bowtie or self-touching ring
+  // can slip mixed windings past normalization: one down-facing triangle
+  // would leave a hole in the roof. Check EACH triangle's cross-product Y
+  // sign and flip only the ones facing down.
   for (const [a, b, c] of faces) {
-    if (flip) indices.push(base + a, base + c, base + b);
-    else      indices.push(base + a, base + b, base + c);
+    if (triangleFacesDown(a, b, c, poly)) {
+      indices.push(base + a, base + c, base + b);
+    } else {
+      indices.push(base + a, base + b, base + c);
+    }
   }
 }
 
 /**
- * Rebuild-per-poly vertex lookup: does the first non-degenerate output
- * triangle have a downward-pointing cross product at height `y`? All input
- * verts share `y`, so any downward result means the winding is inverted.
+ * Does this specific triangle face DOWN? All roof verts share the same Y,
+ * so the normal's XZ components are 0 and only its Y sign matters:
+ *   u = (ux, 0, uz), v = (vx, 0, vz)  →  (u × v).y = uz*vx − ux*vz
+ * Positive → up-facing; negative → down. Degenerate triangles (colinear)
+ * return false so we don't spuriously flip them.
  */
-function firstTriangleFacesDown(
-  faces: number[][],
-  poly: ProjectedPoly,
-  y: number,
-): boolean {
-  const vertAt = (idx: number): { x: number; y: number; z: number } => {
-    if (idx < poly.outer.length) {
-      const p = poly.outer[idx];
-      return { x: p.x, y, z: p.y };
-    }
-    let off = poly.outer.length;
-    for (const hole of poly.holes) {
-      if (idx < off + hole.length) {
-        const p = hole[idx - off];
-        return { x: p.x, y, z: p.y };
-      }
-      off += hole.length;
-    }
-    return { x: 0, y, z: 0 };
-  };
-  for (const [ia, ib, ic] of faces) {
-    const A = vertAt(ia), B = vertAt(ib), C = vertAt(ic);
-    const ux = B.x - A.x, uz = B.z - A.z;
-    const vx = C.x - A.x, vz = C.z - A.z;
-    // Cross product's Y-component in world XYZ: (ux*vz - uz*vx) with Y=0
-    // on both edge vectors → normal.y = ux*vz*... actually with all Y=0:
-    //   u = (ux, 0, uz), v = (vx, 0, vz)  →  u × v = (0, uz*vx - ux*vz, 0)
-    const ny = uz * vx - ux * vz;
-    if (Math.abs(ny) > 1e-6) return ny < 0;
+function triangleFacesDown(a: number, b: number, c: number, poly: ProjectedPoly): boolean {
+  const A = polyVertAt(a, poly);
+  const B = polyVertAt(b, poly);
+  const C = polyVertAt(c, poly);
+  const ux = B.x - A.x, uz = B.z - A.z;
+  const vx = C.x - A.x, vz = C.z - A.z;
+  const ny = uz * vx - ux * vz;
+  return ny < -1e-9;
+}
+
+/** Look up a vertex from the flat outer+holes index space used by Earcut. */
+function polyVertAt(idx: number, poly: ProjectedPoly): { x: number; z: number } {
+  if (idx < poly.outer.length) {
+    const p = poly.outer[idx];
+    return { x: p.x, z: p.y };
   }
-  return false;
+  let off = poly.outer.length;
+  for (const hole of poly.holes) {
+    if (idx < off + hole.length) {
+      const p = hole[idx - off];
+      return { x: p.x, z: p.y };
+    }
+    off += hole.length;
+  }
+  return { x: 0, z: 0 };
 }
 
 /** Centroid of a ring (arithmetic mean — good enough for building hue seeds). */
@@ -167,6 +166,14 @@ export function ringCentroid(ring: Vector2[]): Enu2 {
   for (const p of ring) { sx += p.x; sy += p.y; }
   const n = ring.length || 1;
   return { x: sx / n, z: sy / n };
+}
+
+/**
+ * Positive signed area of a projected ring in world-XZ meters.
+ * Sign is dropped — callers only care about magnitude (footprint area).
+ */
+export function ringArea(ring: Vector2[]): number {
+  return Math.abs(ringSignedArea(ring));
 }
 
 /** Axis-aligned bounding box of a ring — used for seeded tree scattering. */

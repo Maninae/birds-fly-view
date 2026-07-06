@@ -18,10 +18,10 @@ import { Color, Vector2 } from 'three';
 import type { VectorTileLayer } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
-import { parseBuildingHeights } from './buildingHeights';
+import { parseBuildingHeights, sanityCheckHeight } from './buildingHeights';
 import {
   extractPolygons, appendPolygonFlat, featureAnchorInTile,
-  ringBounds, ringCentroid, ProjectedPoly,
+  ringArea, ringBounds, ringCentroid, ProjectedPoly,
 } from './geometryUtils';
 import {
   WALL_SHADE, WALL_BASE_SHADE, hash32, pickBuildingColor,
@@ -143,8 +143,12 @@ export function buildBuildingBuffers(
       // shallow bathymetric shelf. Bridge decks + suspension are drawn
       // separately in `bridges.ts`.
       if (centroidY <= WATER_ELEV_SKIP_M) continue;
+      // Footprint-aware height sanity — clamp bogus OSM rows before we
+      // extrude a spike over SoMa or a multi-block slab over the Sunset.
+      const areaM2 = ringArea(poly.outer);
+      const safeHeight = sanityCheckHeight(heights.height, areaM2);
       const baseY = minGroundY - BASE_SINK_M + heights.base;
-      const topY = centroidY + heights.height;
+      const topY = centroidY + safeHeight;
 
       // Deterministic hue jitter — hash first vertex + centroid.
       const seed = hash32(
