@@ -41,6 +41,14 @@ import { newFlightMemory, stepFlight } from './flight.js';
 import type { FlightMemory, FlightStepResult } from './flight.js';
 import { BirdMesh } from './mesh.js';
 import {
+  horizontalDisplacement,
+  newStuckMemory,
+  performStuckRescue,
+  resetStuck,
+  updateStuckDetector,
+} from './stuckDetector.js';
+import type { StuckMemory } from './stuckDetector.js';
+import {
   LAND_ARC_LIFT,
   LAND_EASE_SEC,
   LAND_FLARE_PITCH,
@@ -70,6 +78,8 @@ export class BirdSystem implements BirdSystemApi {
   private readonly walk: WalkMemory;
   /** Shared "never clip / never underground" state; passed to every step. */
   private readonly col: CollisionMemory;
+  /** Auto-rescue state for the wedged-in-alley case; only ticked in flying mode. */
+  private readonly stuck: StuckMemory;
 
   /** Non-zero while easing between modes; when > 0 we interpolate. */
   private easeT = 0;
@@ -111,6 +121,7 @@ export class BirdSystem implements BirdSystemApi {
     this.flight = newFlightMemory();
     this.walk = newWalkMemory();
     this.col = newCollisionMemory();
+    this.stuck = newStuckMemory();
 
     this.pose = {
       position: new Vector3(0, 100, 0),
@@ -212,6 +223,7 @@ export class BirdSystem implements BirdSystemApi {
     this.walk.velZ = 0;
     this.walk.spaceHold = 0;
     this.walk.bobT = 0;
+    resetStuck(this.stuck);
   }
 
   resize(aspect: number): void {
@@ -259,6 +271,14 @@ export class BirdSystem implements BirdSystemApi {
   // --- per-mode ticks ------------------------------------------------------
 
   private tickFlying(dt: number, input: InputState, world: WorldSource): void {
+    // Snapshot horizontal position for the stuck detector; it compares
+    // what the pose asked to travel this frame against what it actually
+    // covered on the ground plane.
+    const prevX = this.pose.position.x;
+    const prevZ = this.pose.position.z;
+    const commandedHorizontal =
+      this.pose.speed * Math.cos(this.pose.pitch) * dt;
+
     const res: FlightStepResult = stepFlight(
       this.pose, this.flight, this.col, input, world, this.tuning,
       this.steeringScale, dt,
@@ -267,6 +287,24 @@ export class BirdSystem implements BirdSystemApi {
 
     if (input.interact && this._landing) {
       this.beginLandingEase(this._landing);
+      // Skip the stuck check on the frame we started an ease; the pose is
+      // about to be interpolated to touchdown regardless.
+      resetStuck(this.stuck);
+      return;
+    }
+
+    // Auto-rescue: wedged in a downtown gap, we tick the detector on the
+    // actual-vs-commanded displacement. Trigger fires only after ~1.3 s of
+    // wall-scraping near-zero motion.
+    const actualHorizontal = horizontalDisplacement(prevX, prevZ, this.pose);
+    const triggered = updateStuckDetector(this.stuck, {
+      actualHorizontalDisplacement: actualHorizontal,
+      commandedHorizontalDisplacement: Math.abs(commandedHorizontal),
+      wallContact: res.slidingOnWall,
+      dt,
+    });
+    if (triggered) {
+      performStuckRescue(this.pose, this.stuck, this.flight, this.col, this.tuning, world);
     }
   }
 
@@ -357,5 +395,8 @@ export class BirdSystem implements BirdSystemApi {
     this.flight.flareCharge = 0;
     this._mode = 'flying';
     this._landing = null;
+    // Fresh stuck accumulator on takeoff, since the pop above wall height
+    // plus slow-flight pose can look "stuck" for a frame before things settle.
+    resetStuck(this.stuck);
   }
 }
