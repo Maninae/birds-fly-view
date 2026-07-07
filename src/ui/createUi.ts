@@ -181,9 +181,13 @@ export function createUi(opts: CreateUiOptions): UiApi {
     onSelect(point: GeoPoint, label: string, headingDeg?: number) {
       opts.hooks.onTakeoff(point, label, headingDeg);
     },
+    onSelectWorld(kind) {
+      opts.hooks.onWorldKind(kind);
+    },
     onOpenKeyModal() {
       keyModal.open();
     },
+    hasStoredKey: hasStoredGoogleKey,
   });
 
   const openTitle = (midflight: boolean): void => {
@@ -290,6 +294,8 @@ export function createUi(opts: CreateUiOptions): UiApi {
       lastCraft = s.craft;
       lastWorldKind = s.worldKind;
       settings.update({ craft: s.craft, worldKind: s.worldKind });
+      // Title veil's dream/photoreal toggle mirrors the same source of truth.
+      title.setWorldKind(s.worldKind);
     },
   };
 }

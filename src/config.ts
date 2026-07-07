@@ -17,6 +17,17 @@ export const PRESETS: { label: string; lat: number; lon: number; headingDeg?: nu
   { label: 'Lake Merritt, Oakland', lat: 37.8044, lon: -122.2712, headingDeg: 210 },
   { label: 'Downtown San Jose', lat: 37.3337, lon: -121.8907, headingDeg: 330 },
   { label: 'Sather Tower, Berkeley', lat: 37.8721, lon: -122.2578, headingDeg: 265 },
+  // North Bay: Marin vista point off the north end of the Golden Gate Bridge,
+  // aimed south so the towers span the frame straight ahead.
+  { label: 'Golden Gate Bridge', lat: 37.8330, lon: -122.4788, headingDeg: 180 },
+  // Alcatraz on the island itself, aimed south at the SF skyline.
+  { label: 'Alcatraz Island', lat: 37.8267, lon: -122.4223, headingDeg: 180 },
+  // Sausalito waterfront off Bridgeway, aimed SE across the bay at SF.
+  { label: 'Sausalito Waterfront', lat: 37.8590, lon: -122.4840, headingDeg: 135 },
+  // Stanford Main Quad, aimed south at Memorial Church.
+  { label: 'Stanford Main Quad', lat: 37.4275, lon: -122.1697, headingDeg: 180 },
+  // Mission Peak summit above Fremont, aimed west for the huge East Bay vista.
+  { label: 'Mission Peak, Fremont', lat: 37.5124, lon: -121.8805, headingDeg: 270 },
 ];
 
 /** Spawn altitude above ground at takeoff (m). ~260 ft — a bird's view. */
