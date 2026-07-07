@@ -21,6 +21,28 @@ export interface GroundHit {
   kind: 'terrain' | 'building' | 'unknown';
 }
 
+/** First contact along a swept sphere; `t` in [0,1] along the sweep. */
+export interface SweepHit {
+  point: Vector3;
+  normal: Vector3;
+  t: number;
+}
+
+/**
+ * Analytic collision queries. Dream mode implements this from retained
+ * vector data (building footprint prisms + bridge boxes + exact terrain
+ * heightfield). Worlds without vector data (photo) omit it; consumers fall
+ * back to raycast paths when absent.
+ */
+export interface CollisionQuery {
+  /** Highest solid surface at (x,z) with top at or below fromY, within maxDrop. */
+  rayDown(x: number, z: number, fromY: number, maxDrop: number): GroundHit | null;
+  /** Sweep a sphere of `radius` from `from` to `to`; first hit or null. */
+  sweepSphere(from: Vector3, to: Vector3, radius: number): SweepHit | null;
+  /** True if any solid occupies the vertical interval [y0, y1] at (x,z). */
+  occupied(x: number, z: number, y0: number, y1: number): boolean;
+}
+
 /**
  * A streamed 3D world (dream = stylized OSM, photo = Google 3D tiles).
  * Canonical implementations:
@@ -36,6 +58,11 @@ export interface WorldSource {
   update(cameraPos: Vector3, dt: number): void;
   /** Nearest surface straight below `pos` (within maxDist, default 500 m). */
   groundBelow(pos: Vector3, maxDist?: number): GroundHit | null;
+  /**
+   * Analytic collision surface (see CollisionQuery). Present in dream mode;
+   * absent where no vector data exists. Consumers must fall back gracefully.
+   */
+  readonly collision?: CollisionQuery;
   /** Data-source credits for the attribution footer. */
   attributions(): string[];
   dispose(): void;

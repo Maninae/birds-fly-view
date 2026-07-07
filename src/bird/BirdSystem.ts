@@ -99,6 +99,12 @@ export class BirdSystem implements BirdSystemApi {
   /** User "turn & pitch speed" multiplier from the settings panel. */
   private steeringScale = 1;
 
+  /** Snapshot restored by the pose-sanity watchdog if a frame goes non-finite. */
+  private readonly lastGoodPose = {
+    position: new Vector3(0, 100, 0),
+    yaw: 0, pitch: 0, roll: 0, speed: 18,
+  };
+
   constructor(aspect: number) {
     this.meshes = {
       bird: new BirdMesh(),
@@ -192,11 +198,13 @@ export class BirdSystem implements BirdSystemApi {
     this.object.add(this.meshes[craft].root);
     this.activeMesh = this.meshes[craft];
 
-    // Speed floor: never leave the biplane below its stall speed. Above the
-    // floor we leave `speed` alone; the SPEED_RESTORE term pulls it toward
-    // the new cruise on its own.
+    // Clamp speed INTO the new craft's envelope both ways: floor so the
+    // biplane never enters sub-stall, ceiling so a 95 m/s biplane doesn't
+    // become a 95 m/s bird for a frame (visible spike, larger MAX_STEP_M).
     if (this.pose.speed < this.tuning.MIN_AIRSPEED) {
       this.pose.speed = this.tuning.MIN_AIRSPEED;
+    } else if (this.pose.speed > this.tuning.MAX_AIRSPEED) {
+      this.pose.speed = this.tuning.MAX_AIRSPEED;
     }
     // Zero out flap-lift memory so a mid-swap doesn't carry a bird's wing
     // impulse into the biplane's throttle model.
@@ -232,7 +240,9 @@ export class BirdSystem implements BirdSystemApi {
 
   update(dt: number, input: InputState, world: WorldSource): void {
     // Clamp dt so a paused tab doesn't teleport the bird on resume.
-    dt = Math.min(dt, 0.1);
+    // Matches App's MAX_DT_S exactly; the caps used to disagree (0.05 vs
+    // 0.1), which only mattered for harnesses driving BirdSystem without App.
+    dt = Math.min(dt, 0.05);
 
     // Apply any queued craft swap before this frame's physics/mesh/camera
     // read the tuning. Held while easeT > 0 so a landing ease finishes on the
@@ -266,6 +276,38 @@ export class BirdSystem implements BirdSystemApi {
     // Update visual mesh + camera every frame regardless of mode.
     this.activeMesh.update(this.pose, this._mode, dt);
     this.rig.update(this.pose, this._mode, input, world, this.col, this.tuning, dt);
+
+    this.enforcePoseSanity();
+  }
+
+  /**
+   * Invariant watchdog: if any pose component ever goes non-finite (or the
+   * position leaves any plausible world extent), restore the last known good
+   * pose instead of letting the renderer see it. Cheap AAA safety net; the
+   * snapshot costs seven float copies per frame.
+   */
+  private enforcePoseSanity(): void {
+    const p = this.pose;
+    const sane =
+      Number.isFinite(p.position.x) && Number.isFinite(p.position.y) &&
+      Number.isFinite(p.position.z) && Number.isFinite(p.yaw) &&
+      Number.isFinite(p.pitch) && Number.isFinite(p.roll) &&
+      Number.isFinite(p.speed) && p.speed >= 0 &&
+      Math.abs(p.position.y) < 1e5;
+    if (sane) {
+      this.lastGoodPose.position.copy(p.position);
+      this.lastGoodPose.yaw = p.yaw;
+      this.lastGoodPose.pitch = p.pitch;
+      this.lastGoodPose.roll = p.roll;
+      this.lastGoodPose.speed = p.speed;
+      return;
+    }
+    console.warn('BirdSystem: non-finite pose detected, restoring last good pose');
+    p.position.copy(this.lastGoodPose.position);
+    p.yaw = this.lastGoodPose.yaw;
+    p.pitch = this.lastGoodPose.pitch;
+    p.roll = this.lastGoodPose.roll;
+    p.speed = Math.max(this.tuning.MIN_AIRSPEED, this.lastGoodPose.speed);
   }
 
   // --- per-mode ticks ------------------------------------------------------

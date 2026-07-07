@@ -79,11 +79,17 @@ export function stepFlight(
   const substeps = Math.max(1, Math.ceil(displacement / tuning.MAX_STEP_M));
   const stepDt = dt / substeps;
 
-  let result: FlightStepResult = { landing: null, slidingOnWall: false };
+  // OR-latch across substeps: a landing candidate or wall contact seen by ANY
+  // substep survives the frame. Last-substep-only made the landing prompt
+  // flicker at roof edges and hid wall contact from the stuck detector.
+  let landing: FlightStepResult['landing'] = null;
+  let slidingOnWall = false;
   for (let i = 0; i < substeps; i++) {
-    result = advance(pose, mem, col, input, world, tuning, steeringScale, stepDt);
+    const result = advance(pose, mem, col, input, world, tuning, steeringScale, stepDt);
+    if (result.landing) landing = result.landing;
+    slidingOnWall = slidingOnWall || result.slidingOnWall;
   }
-  return result;
+  return { landing, slidingOnWall };
 }
 
 function advance(
