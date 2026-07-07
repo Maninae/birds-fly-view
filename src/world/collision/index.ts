@@ -6,6 +6,7 @@
  */
 export {
   GRID_N,
+  MVT_SPILL_MARGIN_M,
   TileCollisionBuilder,
   tileCollisionByteSize,
   type BridgeBox,
@@ -13,4 +14,3 @@ export {
   type TileCollision,
 } from './tileCollision';
 export { WorldCollision, WATER_ELEVATION_THRESHOLD_M } from './worldCollision';
-export { sweepAndSlide, type SweepSlideResult } from './sweep';

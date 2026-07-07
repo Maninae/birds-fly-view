@@ -8,7 +8,7 @@
  * Prefix-sum encoding: `offsets[i]..offsets[i+1]` are the item indices
  * touching cell `i`. `offsets[GRID_N*GRID_N]` is the total item count.
  */
-import { GRID_N, type TileCollision } from './tileCollision';
+import { GRID_N, MVT_SPILL_MARGIN_M, type TileCollision } from './tileCollision';
 
 /** Row-major cell index for a world XZ point, or -1 if outside the tile. */
 export function cellOfPoint(x: number, z: number, tile: TileCollision): number {
@@ -20,14 +20,32 @@ export function cellOfPoint(x: number, z: number, tile: TileCollision): number {
 }
 
 /**
- * Visit every prism index that touches the cell containing (x, z).
- * No-op when the point is outside the tile.
+ * Row-major cell index including the spill margin: a point within
+ * MVT_SPILL_MARGIN_M outside the tile hoists to the nearest border cell.
+ * Used by point-query paths (`rayDown`, `occupied`) so a query on tile B's
+ * side still visits tile A's border-cell prisms that spilled from A's
+ * anchor. Returns -1 only when truly outside the padded box.
+ */
+function cellOfPointPadded(x: number, z: number, tile: TileCollision): number {
+  if (x < tile.tileMinX - MVT_SPILL_MARGIN_M) return -1;
+  if (x >= tile.tileMaxX + MVT_SPILL_MARGIN_M) return -1;
+  if (z < tile.tileMinZ - MVT_SPILL_MARGIN_M) return -1;
+  if (z >= tile.tileMaxZ + MVT_SPILL_MARGIN_M) return -1;
+  const col = clampCell(Math.floor((x - tile.tileMinX) / tile.cellSizeX));
+  const row = clampCell(Math.floor((z - tile.tileMinZ) / tile.cellSizeZ));
+  return row * GRID_N + col;
+}
+
+/**
+ * Visit every prism index that touches the cell containing (x, z),
+ * including border cells that hold spilled prisms from a neighbor.
+ * No-op when the point is more than MVT_SPILL_MARGIN_M outside the tile.
  */
 export function forEachPrismAt(
   x: number, z: number, tile: TileCollision,
   fn: (prismIndex: number) => void,
 ): void {
-  const cell = cellOfPoint(x, z, tile);
+  const cell = cellOfPointPadded(x, z, tile);
   if (cell < 0) return;
   const start = tile.prismCellOffsets[cell];
   const end = tile.prismCellOffsets[cell + 1];
@@ -39,7 +57,7 @@ export function forEachBridgeAt(
   x: number, z: number, tile: TileCollision,
   fn: (bridgeIndex: number) => void,
 ): void {
-  const cell = cellOfPoint(x, z, tile);
+  const cell = cellOfPointPadded(x, z, tile);
   if (cell < 0) return;
   const start = tile.bridgeCellOffsets[cell];
   const end = tile.bridgeCellOffsets[cell + 1];
@@ -98,8 +116,14 @@ function forEachIndexInSweep(
   const maxX = Math.max(fx, tx) + radius;
   const minZ = Math.min(fz, tz) - radius;
   const maxZ = Math.max(fz, tz) + radius;
-  if (maxX < tile.tileMinX || minX >= tile.tileMaxX) return;
-  if (maxZ < tile.tileMinZ || minZ >= tile.tileMaxZ) return;
+  // Padded early-reject: spilled prisms are rasterized into border cells,
+  // so a query on the neighbor side up to MVT_SPILL_MARGIN_M outside tile
+  // bounds still needs to visit those cells. clampCell below hoists the
+  // out-of-tile cell range onto the border row/column.
+  if (maxX < tile.tileMinX - MVT_SPILL_MARGIN_M) return;
+  if (minX >= tile.tileMaxX + MVT_SPILL_MARGIN_M) return;
+  if (maxZ < tile.tileMinZ - MVT_SPILL_MARGIN_M) return;
+  if (minZ >= tile.tileMaxZ + MVT_SPILL_MARGIN_M) return;
   const c0 = clampCell(Math.floor((minX - tile.tileMinX) / tile.cellSizeX));
   const c1 = clampCell(Math.floor((maxX - tile.tileMinX) / tile.cellSizeX));
   const r0 = clampCell(Math.floor((minZ - tile.tileMinZ) / tile.cellSizeZ));

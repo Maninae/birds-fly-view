@@ -114,6 +114,13 @@ export interface BirdSystemApi {
   /** Swap the active craft mid-flight; preserves pose, clamps speed to new floor. */
   setCraft(craft: CraftKind): void;
   /**
+   * Forget cached ground samples (lastGroundY and friends). Callers invoke
+   * this when the world under the bird is replaced (dream ⇄ photo switch) so
+   * the floor clamp can't hold the bird against the OLD world's terrain
+   * while the new one streams in.
+   */
+  resetGroundMemory(): void;
+  /**
    * Multiplier on yaw / bank / pitch steering rates (0.4..1.6). Values below 1
    * calm the controls for beginners; above 1 speeds them up. Clamped
    * internally. Persists across takeoffs — App re-applies the stored value

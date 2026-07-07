@@ -29,6 +29,8 @@ import {
   forEachPrismAt,
   forEachPrismInSweep,
 } from '../src/world/collision/grid';
+import { sweepSphereWorld } from '../src/world/collision/sweep';
+import { WorldCollision } from '../src/world/collision/worldCollision';
 
 // ── point-in-ring ──────────────────────────────────────────────────────────
 
@@ -311,6 +313,104 @@ describe('TileCollision grid rasterization at borders', () => {
   it('cellOfPoint outside the tile is -1', () => {
     expect(cellOfPoint(-10, 0, tile)).toBe(-1);
     expect(cellOfPoint(0, tileSize + 10, tile)).toBe(-1);
+  });
+});
+
+// ── sweep-band grazing (Finding #4) ────────────────────────────────────────
+
+describe('sweepSpherePrism graze-band fallback', () => {
+  // Reviewer test case: 10x10 prism at origin, sphere at (5.5, y, 0) sweeping
+  // toward (-10, y, 0). d0 for the east face is 0.5, radius is 1 → the sphere
+  // center already overlaps the face plane by (radius - d0). The old code
+  // only ran the plane-crossing branch when d0 >= radius, so this configuration
+  // passed straight through the wall. Fix emits t=0 with the +X normal.
+  const outer = new Float32Array([-5, 5, 5, 5, 5, -5, -5, -5]);
+  const prism: Prism = {
+    outer, holes: [], baseY: 0, topY: 30,
+    minX: -5, minZ: -5, maxX: 5, maxZ: 5,
+  };
+
+  it('sphere in the graze band moving into the face emits t=0 with outward normal', () => {
+    const hit = newPrismSweepHit();
+    sweepSpherePrism(5.5, 15, 0, -10, 15, 0, 1, prism, hit);
+    expect(hit.hit).toBe(true);
+    expect(hit.t).toBe(0);
+    // Outward normal for the east face is (+1, 0).
+    expect(hit.nx).toBeCloseTo(1, 5);
+    expect(hit.nz).toBeCloseTo(0, 5);
+  });
+
+  it('sphere in the graze band moving AWAY (escape) does not spuriously hit', () => {
+    // dDot > 0 → the sphere is exiting the wall, no need for a slide fire.
+    // The wider sweep may still fire for other reasons (top face etc.), so we
+    // check the specific east-face graze branch by using a target that keeps
+    // the sphere above the roof and moving east — no other surface applies.
+    const hit = newPrismSweepHit();
+    sweepSpherePrism(5.5, 15, 0, 20, 15, 0, 1, prism, hit);
+    expect(hit.hit).toBe(false);
+  });
+});
+
+// ── seam spill (Finding #1) ────────────────────────────────────────────────
+
+describe('MVT-buffer spill: tile-B query hits a prism spilled from tile A', () => {
+  // Two adjacent 640x640 tiles. Tile A occupies [0..640] x [0..640]; tile B
+  // occupies [640..1280] x [0..640]. Tile A's anchor is safely inside A, but
+  // the prism footprint spills 2m into tile B (maxX = 642). This exercises
+  // the padded broadphase in sweep.ts (segmentOverlapsTileAabb) AND the
+  // padded reject in grid.ts (forEachIndexInSweep), plus the padded point
+  // query used by rayDown.
+  const tileSize = 640;
+  const spillM = 2;
+  const anchorX = tileSize - 20;                       // 20 m inside tile A's east edge
+  const halfW = 22;                                    // half-footprint spans 22 m → east side sits 2 m into B
+
+  // Canonical outer ring (positive signed area) so the face-plane test
+  // fires on approach — `ringSquare`'s default winding is non-canonical
+  // and only triggers via the depen path.
+  const outerCcw = (cx: number, cz: number, h: number): Vector2[] => [
+    new Vector2(cx - h, cz + h),
+    new Vector2(cx + h, cz + h),
+    new Vector2(cx + h, cz - h),
+    new Vector2(cx - h, cz - h),
+  ];
+
+  const builderA = new TileCollisionBuilder(0, 0, tileSize, tileSize);
+  builderA.addPrismFromV2(outerCcw(anchorX, 320, halfW), [], 0, 60);
+  const tileA = builderA.finalize();
+  // Sanity: the prism's east edge is genuinely 2 m past tile A's boundary.
+  expect(tileA.prisms[0].maxX).toBeCloseTo(tileSize + spillM, 5);
+
+  const builderB = new TileCollisionBuilder(tileSize, 0, tileSize * 2, tileSize);
+  const tileB = builderB.finalize();
+  const tiles = [tileA, tileB];
+
+  it('sweepSphereWorld from inside tile B sweeping WEST into the spilled wall hits it', () => {
+    // Sphere starts 5 m past tile A's east boundary (inside tile B's grid
+    // extents, inside the spilled prism's footprint at x=642 max). Sweep
+    // west toward the wall. Without the seam-spill margin, tile A is
+    // broadphase-rejected and the sphere passes through.
+    const from = new Vector3(tileSize + 5, 30, 320);
+    const to = new Vector3(tileSize + 5 - 20, 30, 320);
+    const hit = sweepSphereWorld(from, to, 1, tiles);
+    expect(hit).not.toBeNull();
+    // Outward normal should point east (+X), the direction of exit through
+    // the wall's east face.
+    expect(hit!.normal.x).toBeCloseTo(1, 3);
+  });
+
+  it('rayDown at a tile-B point over the spilled prism returns the prism roof', () => {
+    // Point sits just inside tile B (x = tileSize + 1) but is under the
+    // prism roof at 60 m. rayDown must visit tile A's border cells.
+    const collision = new WorldCollision({
+      tiles: () => tiles,
+      frame: () => null,          // no terrain contribution needed
+      terrain: {} as never,
+    });
+    const g = collision.rayDown(tileSize + 1, 320, 200, 500);
+    expect(g).not.toBeNull();
+    expect(g!.point.y).toBeCloseTo(60, 5);
+    expect(g!.kind).toBe('building');
   });
 });
 

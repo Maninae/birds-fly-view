@@ -112,10 +112,13 @@ export function sweepSphereBridge(
 
   // Local AABB inflated by radius per axis.
   // Standard swept sphere vs AABB: solve for each slab, then intersect.
-  let tEnter = 0, tExit = 1;
-  let enterAxis = 0;
-  let enterSign = 0;
-  const result = { tEnter, tExit, enterAxis, enterSign };
+  // Reuse the module-scope scratch to avoid a per-call object allocation
+  // (hot: every prism-per-tile in every sweep, per bird step).
+  const result = _slabScratch;
+  result.tEnter = 0;
+  result.tExit = 1;
+  result.enterAxis = 0;
+  result.enterSign = 0;
 
   if (!slab(fu, du, hu + radius, 0, result)) return;
   if (!slab(fv, dv, hv + radius, 1, result)) return;
@@ -158,6 +161,11 @@ export function sweepSphereBridge(
   out.nx = nWx; out.ny = nWy; out.nz = nWz;
 }
 
+interface SlabScratch {
+  tEnter: number; tExit: number; enterAxis: number; enterSign: number;
+}
+const _slabScratch: SlabScratch = { tEnter: 0, tExit: 1, enterAxis: 0, enterSign: 0 };
+
 /**
  * Single-slab sweep for sphere-vs-AABB in local space. Half-extent `h`
  * already includes the sphere radius. Updates the running tEnter/tExit.
@@ -166,7 +174,7 @@ export function sweepSphereBridge(
 function slab(
   origin: number, direction: number, halfExtent: number,
   axis: 0 | 1 | 2,
-  out: { tEnter: number; tExit: number; enterAxis: number; enterSign: number },
+  out: SlabScratch,
 ): boolean {
   if (Math.abs(direction) < 1e-9) {
     // Parallel: if outside the slab, no intersection.
@@ -189,9 +197,15 @@ function slab(
   return out.tEnter <= out.tExit;
 }
 
+/** Clearance beyond the boundary after depenetration (m). */
+const DEPEN_SKIN_M = 0.02;
+
 /**
  * Depenetration for the "already inside" case. Push out along the axis of
- * shallowest penetration in the local frame.
+ * shallowest penetration in the local frame; write the fully-pushed-out
+ * sphere-center position into `out.px/py/pz` so the caller can teleport
+ * directly to it. Push size = shallowest-penetration + skin (that penetration
+ * already includes the sphere radius, so the sphere just clears the face).
  */
 function depenetrateBridgeMTV(
   fu: number, fv: number, fw: number,
@@ -202,12 +216,15 @@ function depenetrateBridgeMTV(
   out: BoxSweepHit,
 ): void {
   // Penetration on each axis: how much the sphere overlaps the slab.
+  // Half-extents already include the radius, so `p` is the exact push
+  // needed on that axis to clear the face.
   const pu = hu + radius - Math.abs(fu);
   const pv = hv + radius - Math.abs(fv);
   const pw = hw + radius - Math.abs(fw);
   let axis = 0;
-  if (pv < pu && pv <= pw) axis = 1;
-  else if (pw < pu && pw < pv) axis = 2;
+  let bestP = pu;
+  if (pv < bestP) { axis = 1; bestP = pv; }
+  if (pw < bestP) { axis = 2; bestP = pw; }
   let lnu = 0, lnv = 0, lnw = 0;
   if (axis === 0) lnu = fu >= 0 ? 1 : -1;
   else if (axis === 1) lnv = fv >= 0 ? 1 : -1;
@@ -215,11 +232,16 @@ function depenetrateBridgeMTV(
   const nWx = lnu * box.tx + lnv * box.nx;
   const nWy = lnw;
   const nWz = lnu * box.tz + lnv * box.nz;
+  // Pushed-out sphere-center in local frame; project back to world.
+  const push = bestP + DEPEN_SKIN_M;
+  const fuOut = fu + lnu * push;
+  const fvOut = fv + lnv * push;
+  const fwOut = fw + lnw * push;
   out.hit = true;
   out.t = 0;
-  out.px = cx + fu * box.tx + fv * box.nx;
-  out.py = cy + fw;
-  out.pz = cz + fu * box.tz + fv * box.nz;
+  out.px = cx + fuOut * box.tx + fvOut * box.nx;
+  out.py = cy + fwOut;
+  out.pz = cz + fuOut * box.tz + fvOut * box.nz;
   out.nx = nWx; out.ny = nWy; out.nz = nWz;
   void radius;
 }

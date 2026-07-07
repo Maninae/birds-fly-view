@@ -120,6 +120,13 @@ export class TileStreamer {
 
   private readyGate?: TileReadyGate;
 
+  /**
+   * Cached snapshot of every ready tile's `TileCollision`. Rebuilt lazily
+   * on the next `collisionTiles()` call after an add/evict, so hot-path
+   * queries (bird per-step sweep + ground floor) don't rebuild the array.
+   */
+  private collisionCache: TileCollision[] | null = null;
+
   constructor(builder: TileBuilder, readyGate?: TileReadyGate) {
     this.root = new Group();
     this.root.name = 'stylized-vector-tiles';
@@ -225,6 +232,7 @@ export class TileStreamer {
     this.queued.length = 0;
     this.buildQueue.length = 0;
     this.globalEdges.clear();
+    this.collisionCache = null;
   }
 
   // ── Internal ─────────────────────────────────────────────────────────────
@@ -280,6 +288,8 @@ export class TileStreamer {
         if (result.root) entry.root.add(result.root);
         if (result.collision) entry.collision = result.collision;
         entry.state = 'ready';
+        // Tile just entered the ready set → invalidate the collision cache.
+        this.collisionCache = null;
       } catch {
         entry.state = 'failed';
       }
@@ -306,6 +316,8 @@ export class TileStreamer {
     if (entry.wallEdges) {
       for (const key of entry.wallEdges) this.globalEdges.delete(key);
     }
+    // If the tile had a collision payload, our cache is now stale.
+    if (entry.collision) this.collisionCache = null;
     entry.pendingTile = undefined;
     entry.collision = undefined;
     this.disposeSubtree(entry.root);
@@ -315,15 +327,18 @@ export class TileStreamer {
 
   /**
    * Snapshot of every ready tile's collision payload. Used by
-   * `WorldCollision` to iterate the loaded world. The array is fresh each
-   * call — collision queries are per-frame, so a per-frame allocation is
-   * cheaper than maintaining a live view that gets invalidated on evict.
+   * `WorldCollision` to iterate the loaded world. Cached and invalidated
+   * on tile ready/evict — the bird calls this multiple times per frame
+   * (rayDown per probe, sweepSphere per bump), so a per-call rebuild was
+   * measurable in the profile.
    */
   collisionTiles(): TileCollision[] {
+    if (this.collisionCache) return this.collisionCache;
     const out: TileCollision[] = [];
     for (const entry of this.tiles.values()) {
       if (entry.state === 'ready' && entry.collision) out.push(entry.collision);
     }
+    this.collisionCache = out;
     return out;
   }
 

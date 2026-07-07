@@ -24,6 +24,22 @@ import type { Vector2 } from 'three';
 export const GRID_N = 16;
 
 /**
+ * How far a building/bridge feature can spill outside its anchor tile via
+ * the MVT extent buffer (m). Buildings whose anchor point sits inside tile
+ * A can extend geometry into tile B through the MVT buffer, and a query on
+ * the tile-B side would otherwise reject A entirely — the walk-through-wall
+ * seam bug. Broadphase (sweep.ts + grid.ts) pads tile bounds by this
+ * margin so spilled prisms still get visited.
+ *
+ * OpenFreeMap tiles use a small MVT buffer (~4-16 tile-units ≈ 2-8 m at
+ * z14 SF-latitude); 32 m is a generous margin that covers realistic
+ * footprint spill, at negligible cost (the pad only inflates the reject
+ * window). Grid rasterize (`clampCell`) already clamps spilled prism AABBs
+ * to border cells, so the read side just needs the padded reject.
+ */
+export const MVT_SPILL_MARGIN_M = 32;
+
+/**
  * One building's collidable volume. The Y interval [baseY, topY] is the
  * building's extrusion range in world units; `outer` is CCW-from-above and
  * `holes` are CW-from-above, matching the canonical winding elsewhere.

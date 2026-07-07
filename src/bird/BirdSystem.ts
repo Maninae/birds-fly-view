@@ -112,10 +112,14 @@ export class BirdSystem implements BirdSystemApi {
     flap: false, flapHold: false, brake: false,
     interact: false, toggleCam: false, pointerLocked: false,
   };
-  /** Edge-input latches: OR-in per render frame, fire on the FIRST step. */
+  /**
+   * Edge-input latches for physics ticks: OR-in per render frame, fire on
+   * the FIRST step. `toggleCam` (V) is deliberately NOT latched here —
+   * camera reads raw render-frame input directly (see `rig.update` below),
+   * so the physics loop shouldn't consume it.
+   */
   private latchedFlap = false;
   private latchedInteract = false;
-  private latchedToggleCam = false;
   /** Cumulative count of physics steps run; exposed on the dev hook. */
   private physicsStepCount = 0;
 
@@ -207,6 +211,18 @@ export class BirdSystem implements BirdSystemApi {
     this.steeringScale = Math.min(1.6, Math.max(0.4, scale));
   }
 
+  /**
+   * Forget cached ground samples. App calls this on world switch (dream ⇄
+   * photo) so `enforceGroundFloor` can't clamp the bird against the OLD
+   * world's terrain while the new one streams in. Also resets the wall-
+   * clear streak so the throttled probe schedule starts fresh.
+   */
+  resetGroundMemory(): void {
+    this.col.lastGroundY = null;
+    this.col.lastGroundKind = null;
+    this.col.wallClearSteps = 0;
+  }
+
   setCraft(craft: CraftKind): void {
     if (craft === this._craft && this.pendingCraft === null) return;
     // If the pending swap would just cancel back to current, drop it.
@@ -278,7 +294,6 @@ export class BirdSystem implements BirdSystemApi {
     this.accumulator.seconds = 0;
     this.latchedFlap = false;
     this.latchedInteract = false;
-    this.latchedToggleCam = false;
   }
 
   resize(aspect: number): void {
@@ -301,7 +316,6 @@ export class BirdSystem implements BirdSystemApi {
     // so a 30 Hz display doesn't double-fire E across two steps.
     if (input.flap) this.latchedFlap = true;
     if (input.interact) this.latchedInteract = true;
-    if (input.toggleCam) this.latchedToggleCam = true;
 
     // Held / axis inputs sample the latest render-frame values (a hold that
     // straddles physics steps is naturally repeated).
@@ -314,20 +328,20 @@ export class BirdSystem implements BirdSystemApi {
     step.mouseDX = input.mouseDX;
     step.mouseDY = input.mouseDY;
     step.pointerLocked = input.pointerLocked;
+    // Camera consumes raw render-frame input (see rig.update below), so the
+    // physics loop never gets a live toggleCam; leave the field false.
+    step.toggleCam = false;
 
     const steps = planPhysicsSteps(this.accumulator, dt);
     for (let i = 0; i < steps; i++) {
       if (i === 0) {
         step.flap = this.latchedFlap;
         step.interact = this.latchedInteract;
-        step.toggleCam = this.latchedToggleCam;
         this.latchedFlap = false;
         this.latchedInteract = false;
-        this.latchedToggleCam = false;
       } else {
         step.flap = false;
         step.interact = false;
-        step.toggleCam = false;
       }
       this.physicsStep(FIXED_DT_SEC, step, world);
       consumeStep(this.accumulator);
@@ -457,6 +471,10 @@ export class BirdSystem implements BirdSystemApi {
     });
     if (triggered) {
       performStuckRescue(this.pose, this.stuck, this.flight, this.col, this.tuning, world);
+      // Rescue teleports the pose ~40 m up. Re-sync the interpolation
+      // snapshot so the next presentation lerp doesn't smear the mesh
+      // across that pop for one frame.
+      copyPose(this.pose, this.prevPhysicsPose);
     }
   }
 

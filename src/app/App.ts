@@ -195,6 +195,12 @@ export class App {
         if (hasSetCamera(world) && this.bird) {
           world.setCamera(this.bird.camera, this.renderer);
         }
+        // Drop any ground/wall memory cached against the previous world so
+        // the first frames of the new world can't be clamped to the OLD
+        // world's floor. onBuilt (pre-init) is the safest wire point: the
+        // new world is on the scene but its terrain hasn't streamed yet,
+        // and the bird's next update() must not fall back to lastGroundY.
+        this.bird?.resetGroundMemory();
       },
       onReady: () => {
         // no-op — App reads switcher.current in the loop.

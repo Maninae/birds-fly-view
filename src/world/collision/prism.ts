@@ -272,6 +272,31 @@ function sweepAgainstEdge(
         }
       }
     }
+  } else if (d0 > 0 && dDot < 0 && 0 < out.t) {
+    // Graze band: sphere center is between the face plane (d=0) and one
+    // radius out (d < radius) — i.e. the sphere is already touching the
+    // face from outside. Because d0 < radius, the standard plane-crossing
+    // branch above never runs; without this fallback the sphere passes
+    // through the wall. Emit t=0 with the face's outward normal so the
+    // slide-along-wall path fires.
+    //
+    // Endpoint gating: only qualify when the current sphere center projects
+    // inside the edge extent AND its Y overlaps [baseY, topY]. Corner
+    // touches fall through to `testEdgeCap` on adjacent edges.
+    const px = fx - ax, pz = fz - az;
+    const along = (px * (bx - ax) + pz * (bz - az)) / edgeLen2;
+    if (along >= 0 && along <= 1) {
+      if (fy + radius >= baseY && fy - radius <= topY) {
+        out.hit = true;
+        out.t = 0;
+        // Contact point on the face at the current XZ position (nearest to
+        // the sphere center along the normal).
+        out.px = fx - nxOut * d0;
+        out.py = fy;
+        out.pz = fz - nzOut * d0;
+        out.nx = nxOut; out.ny = 0; out.nz = nzOut;
+      }
+    }
   }
 }
 
@@ -315,18 +340,25 @@ function testEdgeCap(
   out.nx = nx / nMag; out.ny = 0; out.nz = nz / nMag;
 }
 
+/** How much clearance to leave past the boundary when depenetrating (m). */
+const DEPEN_SKIN_M = 0.02;
+
 /**
- * Depenetration when the sphere center is already inside the prism. Returns
- * `t=0` and the outward-pointing MTV normal so the caller can push the
- * sphere out along it. `out.py` carries the extra "depth" the caller
- * should push (radius + interior-distance-to-boundary), which is enough to
- * fully exit the wall in one bump for a normal thickness.
+ * Depenetration when the sphere center is already inside the prism. Emits
+ * `t=0`, the outward-pointing MTV normal, and — in `out.px/py/pz` — the
+ * pushed-out sphere-center position, sized `nearestBoundaryDistance +
+ * radius + skin` so a single bump fully clears the wall no matter how deep
+ * the initial overlap.
  *
  * Choice of direction:
  *   - Distance up through the roof:  topY - fy (positive when fy < topY).
  *   - Distance down through the base: fy - baseY.
  *   - Distance out through the nearest wall: |bird - closest wall point| in XZ.
  * We pick whichever is smallest — the shallowest exit — and push along that.
+ *
+ * The caller (bird/collision.ts sweepFlightMove) reads `out.px/py/pz` as
+ * the target sphere-center position for this bump; on a clean depen, one
+ * bump clears the wall and remaining motion continues on the next bump.
  */
 function depenetratePrismMTV(
   fx: number, fy: number, fz: number,
@@ -363,7 +395,6 @@ function depenetratePrismMTV(
       // OUTWARD push direction: from bird toward boundary (and past it).
       // For a bird strictly inside footprint, (qx - fx, qz - fz) points
       // toward the boundary; normalized, it's the correct outward MTV.
-      // The old code used the inverse, which pushed the bird DEEPER inward.
       const dx = qx - fx, dz = qz - fz;
       const dist = Math.hypot(dx, dz);
       if (dist < bestDist) {
@@ -381,15 +412,14 @@ function depenetratePrismMTV(
       }
     }
   }
+  // Push distance = interior-distance-to-boundary + radius + skin: one
+  // bump fully exits a wall of any thickness. The old code used a fixed
+  // step (radius + margin) which under-pushed on deep tunneling.
+  const push = bestDist + radius + DEPEN_SKIN_M;
   out.hit = true;
   out.t = 0;
-  // `px/py/pz` carry the "how deep" push distance the caller needs; we
-  // stash it in py to avoid growing the shared struct. The caller reads
-  // `nx/ny/nz` for direction and uses its own SKIN/scaling.
-  out.px = fx;
-  out.py = fy;
-  out.pz = fz;
+  out.px = fx + bestNx * push;
+  out.py = fy + bestNy * push;
+  out.pz = fz + bestNz * push;
   out.nx = bestNx; out.ny = bestNy; out.nz = bestNz;
-  void radius;
-  void bestDist;
 }

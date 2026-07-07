@@ -305,14 +305,6 @@ export interface SweepMoveResult {
 const SWEEP_MAX_BUMPS = 3;
 /** Skin margin before contact — leaves the sphere just off the surface. */
 const SWEEP_SKIN = 0.02;
-/**
- * Depenetration push per iteration when starting inside a solid. Sized so
- * the sphere fully exits a normal wall in one bump — pushes by
- * `radius + a bit`, not a tiny fixed step. A fixed 0.15 m step let a bird
- * spawned inside a building crawl out at 0.45 m/frame ≈ 27 m/s vertically,
- * which read as a ghost climb.
- */
-const SWEEP_DEPEN_MARGIN = 0.5;
 
 const _sweepFrom = new Vector3();
 const _sweepTarget = new Vector3();
@@ -340,22 +332,31 @@ export function sweepFlightMove(
   for (let bump = 0; bump < SWEEP_MAX_BUMPS; bump++) {
     col.probeCount++;
     const swept = collision.sweepSphere(_sweepCurrent, _sweepTarget, radius);
-    if (!swept) break;
+    if (!swept) {
+      // Sweep is clear from current → target. Advance to target and stop.
+      // On a clean initial sweep this completes the intended motion; on a
+      // clean sweep AFTER a hit (typical wall slide), it completes the
+      // remaining slide-along-wall motion instead of dropping it.
+      _sweepCurrent.copy(_sweepTarget);
+      break;
+    }
     hit = true;
     lastNx = swept.normal.x; lastNy = swept.normal.y; lastNz = swept.normal.z;
 
     if (swept.t <= 0) {
-      // Sphere starts inside a solid — push out by (radius + margin) along
-      // the MTV normal, which is enough to fully exit any wall thinner than
-      // that per bump. Both current AND target move so the next bump keeps
-      // whatever remaining motion the caller intended.
-      const push = radius + SWEEP_DEPEN_MARGIN;
-      _sweepCurrent.x += lastNx * push;
-      _sweepCurrent.y += lastNy * push;
-      _sweepCurrent.z += lastNz * push;
-      _sweepTarget.x += lastNx * push;
-      _sweepTarget.y += lastNy * push;
-      _sweepTarget.z += lastNz * push;
+      // Sphere starts inside a solid. `swept.point` is the fully-pushed-out
+      // sphere-center position from the analytic depen (sized boundary-
+      // distance + radius + skin), so one bump always clears the wall no
+      // matter how deep the overlap. Shift target by the same delta so the
+      // next bump keeps whatever remaining motion the caller intended.
+      const px = swept.point.x, py = swept.point.y, pz = swept.point.z;
+      const shiftX = px - _sweepCurrent.x;
+      const shiftY = py - _sweepCurrent.y;
+      const shiftZ = pz - _sweepCurrent.z;
+      _sweepCurrent.set(px, py, pz);
+      _sweepTarget.x += shiftX;
+      _sweepTarget.y += shiftY;
+      _sweepTarget.z += shiftZ;
       continue;
     }
     // Advance to just before contact.
@@ -384,12 +385,8 @@ export function sweepFlightMove(
     _sweepTarget.z = _sweepCurrent.z + remZ - lastNz * rDotN;
   }
 
-  if (!hit) {
-    _sweepCurrent.copy(_sweepTarget);
-    col.wallClearSteps++;
-  } else {
-    col.wallClearSteps = 0;
-  }
+  if (hit) col.wallClearSteps = 0;
+  else col.wallClearSteps++;
   pose.position.copy(_sweepCurrent);
   _sweepResShared.hit = hit;
   _sweepResShared.nx = lastNx;

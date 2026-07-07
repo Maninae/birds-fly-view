@@ -21,9 +21,10 @@ The centerpiece: `CollisionQuery` (defined in `src/types.ts`) exposed on
 - **grid.ts** — 16x16 uniform grid index over a tile's XZ box. Builds prefix
   sum arrays from item AABBs; queries return candidate item indices for a
   point or a swept segment.
-- **sweep.ts** — high-level `sweepAndSlide(from, to, radius, world)`: sweeps
-  the sphere across the whole loaded world, slides on hit, depenetrates when
-  starting inside, iterates a few bumps. This is what `flight.ts` calls.
+- **sweep.ts** — high-level `sweepSphereWorld(from, to, radius, tiles)`:
+  earliest hit across every tile with per-tile broadphase padded by
+  `MVT_SPILL_MARGIN_M`. Backs `CollisionQuery.sweepSphere`; the bird-side
+  slide-along-wall iteration lives in `bird/collision.ts::sweepFlightMove`.
 - **worldCollision.ts** — implements `CollisionQuery` over all loaded tiles +
   the terrain sampler + the water constants. Owned by `StylizedWorld`.
 - **index.ts** — public re-exports for `StylizedWorld` and the tile builders.

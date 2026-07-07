@@ -56,6 +56,10 @@ export class FakeBird implements BirdSystemApi {
     // No-op — the FakeBird flies a fixed circle and has no user steering.
   }
 
+  resetGroundMemory(): void {
+    // No-op — FakeBird has no ground clamp to invalidate.
+  }
+
   placeAt(position: Vector3, headingRad: number): void {
     this._pose.position.copy(position);
     this._pose.yaw = headingRad;
