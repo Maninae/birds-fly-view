@@ -37,6 +37,17 @@ import {
   readStoredCraft,
   writeStoredCraft,
 } from './craftTuning.js';
+import {
+  Accumulator,
+  copyPose,
+  consumeStep,
+  FIXED_DT_SEC,
+  interpolationAlpha,
+  lerpPose,
+  newAccumulator,
+  newPoseScratch,
+  planPhysicsSteps,
+} from './fixedTimestep.js';
 import { newFlightMemory, stepFlight } from './flight.js';
 import type { FlightMemory, FlightStepResult } from './flight.js';
 import { BirdMesh } from './mesh.js';
@@ -88,6 +99,26 @@ export class BirdSystem implements BirdSystemApi {
   /** Latch: which mode to enter when the ease completes. */
   private easeTargetMode: AppMode = 'flying';
 
+  // --- Fixed-timestep simulation state ----------------------------------
+  /** Accumulator for the fixed physics step; drained by `update()`. */
+  private readonly accumulator: Accumulator = newAccumulator();
+  /** Snapshot of the physics pose BEFORE the last executed step. */
+  private readonly prevPhysicsPose: BirdPose = newPoseScratch();
+  /** Rendered pose (interpolated prev -> cur); consumed by mesh + camera. */
+  private readonly presentPose: BirdPose = newPoseScratch();
+  /** Persistent step-input scratch — mutated per step, no per-frame alloc. */
+  private readonly stepInput: InputState = {
+    forward: 0, turn: 0, pitchAxis: 0, mouseDX: 0, mouseDY: 0,
+    flap: false, flapHold: false, brake: false,
+    interact: false, toggleCam: false, pointerLocked: false,
+  };
+  /** Edge-input latches: OR-in per render frame, fire on the FIRST step. */
+  private latchedFlap = false;
+  private latchedInteract = false;
+  private latchedToggleCam = false;
+  /** Cumulative count of physics steps run; exposed on the dev hook. */
+  private physicsStepCount = 0;
+
   /**
    * Pending craft swap. `setCraft()` records the requested craft here; the swap
    * is actually applied at the top of `update()` once `easeT === 0`, so a
@@ -137,6 +168,10 @@ export class BirdSystem implements BirdSystemApi {
       speed: this.tuning.CRUISE_SPEED,
       flapPhase: 0,
     };
+    // Prev + present start identical to the physics pose; interpolation is
+    // stable until the first physics step runs.
+    copyPose(this.pose, this.prevPhysicsPose);
+    copyPose(this.pose, this.presentPose);
 
     // Dev-time diagnostic hook (dev builds only). Lets integration tests observe
     // pose + mode without threading state through the coordinator. Vite tree-
@@ -236,6 +271,14 @@ export class BirdSystem implements BirdSystemApi {
     this.walk.spaceHold = 0;
     this.walk.bobT = 0;
     resetStuck(this.stuck);
+    // Re-sync interpolation to the teleported pose so the first rendered
+    // frame doesn't lerp from the old prev to the new position.
+    copyPose(this.pose, this.prevPhysicsPose);
+    copyPose(this.pose, this.presentPose);
+    this.accumulator.seconds = 0;
+    this.latchedFlap = false;
+    this.latchedInteract = false;
+    this.latchedToggleCam = false;
   }
 
   resize(aspect: number): void {
@@ -243,43 +286,103 @@ export class BirdSystem implements BirdSystemApi {
   }
 
   update(dt: number, input: InputState, world: WorldSource): void {
-    // Clamp dt so a paused tab doesn't teleport the bird on resume.
-    // Matches App's MAX_DT_S exactly; the caps used to disagree (0.05 vs
-    // 0.1), which only mattered for harnesses driving BirdSystem without App.
+    // Outer wall-dt clamp: a paused tab must not burst-catch-up beyond the
+    // accumulator cap. The accumulator itself is capped at MAX_CATCHUP_STEPS
+    // steps (see fixedTimestep.ts); this outer clamp is belt-and-braces.
     dt = Math.min(dt, 0.05);
 
-    // Apply any queued craft swap before this frame's physics/mesh/camera
-    // read the tuning. Held while easeT > 0 so a landing ease finishes on the
-    // mesh + collision extent it started with.
+    // Apply any queued craft swap before this frame's physics loop reads
+    // tuning. Held while easeT > 0 so a landing ease finishes on the mesh +
+    // collision extent it started with.
     this.applyPendingCraft();
 
+    // OR-latch this frame's edge inputs; the FIRST physics step consumes
+    // them, subsequent steps see them as false. Cleared once a step fires
+    // so a 30 Hz display doesn't double-fire E across two steps.
+    if (input.flap) this.latchedFlap = true;
+    if (input.interact) this.latchedInteract = true;
+    if (input.toggleCam) this.latchedToggleCam = true;
+
+    // Held / axis inputs sample the latest render-frame values (a hold that
+    // straddles physics steps is naturally repeated).
+    const step = this.stepInput;
+    step.forward = input.forward;
+    step.turn = input.turn;
+    step.pitchAxis = input.pitchAxis;
+    step.flapHold = input.flapHold;
+    step.brake = input.brake;
+    step.mouseDX = input.mouseDX;
+    step.mouseDY = input.mouseDY;
+    step.pointerLocked = input.pointerLocked;
+
+    const steps = planPhysicsSteps(this.accumulator, dt);
+    for (let i = 0; i < steps; i++) {
+      if (i === 0) {
+        step.flap = this.latchedFlap;
+        step.interact = this.latchedInteract;
+        step.toggleCam = this.latchedToggleCam;
+        this.latchedFlap = false;
+        this.latchedInteract = false;
+        this.latchedToggleCam = false;
+      } else {
+        step.flap = false;
+        step.interact = false;
+        step.toggleCam = false;
+      }
+      this.physicsStep(FIXED_DT_SEC, step, world);
+      consumeStep(this.accumulator);
+      this.physicsStepCount++;
+    }
+
+    // Presentation pose = lerp(prev, cur, alpha). Mesh + camera read this
+    // interpolated pose so motion stays silky-smooth at any display rate.
+    // Collision/flight/walk math already ran on the true physics pose.
+    const alpha = interpolationAlpha(this.accumulator);
+    lerpPose(this.prevPhysicsPose, this.pose, alpha, this.presentPose);
+
+    // Camera consumes raw render-frame input so toggleCam (V) fires exactly
+    // once per keypress; the physics loop above already had its own chance
+    // to consume the latched edge.
+    this.activeMesh.update(this.presentPose, this._mode, dt);
+    this.rig.update(this.presentPose, this._mode, input, world, this.col, this.tuning, dt);
+
+    // Dev-only: expose the current world on the instance so headed integration
+    // tests can hit `world.collision.occupied` without threading it through App.
+    if (import.meta.env?.DEV) {
+      (this as unknown as { __world: WorldSource }).__world = world;
+    }
+  }
+
+  /**
+   * One fixed-size physics step. Snapshots the pre-step pose (for the
+   * render interpolation), runs the mode's tick, applies the belt-and-braces
+   * floor for modes that don't clamp internally, then sanity-checks the
+   * pose. Called 0..MAX_CATCHUP_STEPS times per render frame.
+   */
+  private physicsStep(stepDt: number, stepInput: InputState, world: WorldSource): void {
+    copyPose(this.pose, this.prevPhysicsPose);
+
     if (this.easeT > 0) {
-      this.tickEase(dt);
+      this.tickEase(stepDt);
     } else {
       switch (this._mode) {
         case 'flying':
-          this.tickFlying(dt, input, world);
+          this.tickFlying(stepDt, stepInput, world);
           break;
         case 'walking':
-          this.tickWalking(dt, input, world);
+          this.tickWalking(stepDt, stepInput, world);
           break;
         case 'perched':
-          this.tickPerched(dt, input, world);
+          this.tickPerched(stepDt, stepInput, world);
           break;
       }
     }
 
-    // Belt-and-braces floor: the flying/walking steps already clamp inside
-    // their `advance`, so re-running here would double the raycast cost with
-    // no added guarantee. Perched idle + mid-ease frames don't run those
-    // steps, so we clamp only in those modes to keep the invariant.
+    // flying/walking clamp inside their advance; perched + ease don't, so
+    // enforce the floor here to keep the "never underground" invariant.
     if (this._mode === 'perched' || this.easeT > 0) {
       enforceGroundFloor(this.pose, this.col, world, 0.02);
     }
-
-    // Update visual mesh + camera every frame regardless of mode.
-    this.activeMesh.update(this.pose, this._mode, dt);
-    this.rig.update(this.pose, this._mode, input, world, this.col, this.tuning, dt);
 
     this.enforcePoseSanity();
   }
@@ -312,6 +415,9 @@ export class BirdSystem implements BirdSystemApi {
     p.pitch = this.lastGoodPose.pitch;
     p.roll = this.lastGoodPose.roll;
     p.speed = Math.max(this.tuning.MIN_AIRSPEED, this.lastGoodPose.speed);
+    // Sync the interpolation prev so the next presentation lerp doesn't
+    // pull the mesh back through the corrupted pose that just got wiped.
+    copyPose(p, this.prevPhysicsPose);
   }
 
   // --- per-mode ticks ------------------------------------------------------

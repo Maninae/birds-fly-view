@@ -39,10 +39,11 @@ import {
  * every controller step. `lastGroundY` lets us maintain a floor when tiles
  * are momentarily unavailable (Bay water sample returns null, tile pop-in).
  *
- * `wallClearFrames` and `camCheckCounter` power the probe-throttling that
- * cuts raycast cost in half without weakening any guarantee — wall probes
- * only every other frame once we've been in the clear for a while, and the
- * camera-unclip sweep runs once every N frames instead of every frame.
+ * `wallClearSteps` counts consecutive clear PHYSICS STEPS (not render frames)
+ * because the sim now runs on a fixed 120 Hz step; step-based throttling
+ * makes the timing invariant to display rate. It powers the every-other-step
+ * skip on wall probes once we've been in the clear for a while — same
+ * guarantee, half the raycast cost in cruise.
  *
  * `probeCount` is a cumulative counter every helper increments; the dev
  * hook reads it to compute raycasts / frame for perf reporting.
@@ -50,8 +51,7 @@ import {
 export interface CollisionMemory {
   lastGroundY: number | null;
   lastGroundKind: GroundHit['kind'] | null;
-  wallClearFrames: number;
-  camCheckCounter: number;
+  wallClearSteps: number;
   probeCount: number;
 }
 
@@ -59,18 +59,15 @@ export function newCollisionMemory(): CollisionMemory {
   return {
     lastGroundY: null,
     lastGroundKind: null,
-    wallClearFrames: 0,
-    camCheckCounter: 0,
+    wallClearSteps: 0,
     probeCount: 0,
   };
 }
 
-/** How many consecutive clear frames before wall probes go every-other-frame. */
-const WALL_PROBE_WARMUP_FRAMES = 5;
-/** Speed above which we always probe every frame regardless of history. */
+/** How many consecutive clear physics steps before wall probes go every-other-step. */
+const WALL_PROBE_WARMUP_STEPS = 5;
+/** Speed above which we always probe every step regardless of history. */
 const WALL_PROBE_ALWAYS_SPEED = 30;
-/** Camera unclip sweeps every N frames (16-33 ms drift between checks is safe). */
-const CAM_CHECK_EVERY = 3;
 
 /**
  * Enforce that `pose.position.y >= floor + epsilon`. Updates `col.lastGroundY`
@@ -139,16 +136,16 @@ export function wallSlide(
   out.velX = velX;
   out.velZ = velZ;
 
-  // Throttling: after enough consecutive clear frames, only probe every OTHER
-  // frame — safe because between probes the bird moves at most speed·2·dt,
+  // Throttling: after enough consecutive clear steps, only probe every OTHER
+  // step — safe because between probes the bird moves at most speed·2·dt,
   // still well inside the lookahead margin. At high speed we never throttle
-  // so a fast dive can't slip past a wall in a skipped frame.
+  // so a fast dive can't slip past a wall in a skipped step.
   const speed = Math.sqrt(velX * velX + velZ * velZ);
   const canThrottle =
-    col.wallClearFrames >= WALL_PROBE_WARMUP_FRAMES &&
+    col.wallClearSteps >= WALL_PROBE_WARMUP_STEPS &&
     speed < WALL_PROBE_ALWAYS_SPEED;
-  if (canThrottle && (col.wallClearFrames & 1) === 1) {
-    col.wallClearFrames++;
+  if (canThrottle && (col.wallClearSteps & 1) === 1) {
+    col.wallClearSteps++;
     return;
   }
 
@@ -192,10 +189,10 @@ export function wallSlide(
   if (check(px2, pz2)) hits++;
 
   if (hits === 0) {
-    col.wallClearFrames++;
+    col.wallClearSteps++;
     return;
   }
-  col.wallClearFrames = 0;
+  col.wallClearSteps = 0;
 
   const nMag = Math.sqrt(nx * nx + nz * nz);
   if (nMag < 0.01) {
@@ -234,6 +231,10 @@ export function projectVelocity(
  * outward; the first inside-geometry sample defines the wall-entry, and the
  * camera is placed `CAM_CLIP_MARGIN` metres closer to the bird than that.
  * Guarantees a minimum distance so the camera can't collapse into the bird.
+ *
+ * Called every render frame (dream mode uses the analytic swept-sphere arm
+ * in `cameraArm.ts` instead; this raycast sampler is the photo-mode fallback
+ * and runs each frame now that BVH acceleration makes the sweep cheap).
  */
 const _tmp = new Vector3();
 
@@ -243,12 +244,6 @@ export function unclipCamera(
   world: WorldSource,
   col: CollisionMemory,
 ): void {
-  // Throttling: run the sample sweep only once every CAM_CHECK_EVERY frames.
-  // Between checks the camera drifts at most ~0.5 m at damp half-life 0.14 s,
-  // nowhere near enough to enter a wall from a previously-safe position.
-  col.camCheckCounter++;
-  if (col.camCheckCounter % CAM_CHECK_EVERY !== 0) return;
-
   const dx = camPos.x - birdPos.x;
   const dy = camPos.y - birdPos.y;
   const dz = camPos.z - birdPos.z;
@@ -391,9 +386,9 @@ export function sweepFlightMove(
 
   if (!hit) {
     _sweepCurrent.copy(_sweepTarget);
-    col.wallClearFrames++;
+    col.wallClearSteps++;
   } else {
-    col.wallClearFrames = 0;
+    col.wallClearSteps = 0;
   }
   pose.position.copy(_sweepCurrent);
   _sweepResShared.hit = hit;

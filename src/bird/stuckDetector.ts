@@ -181,9 +181,9 @@ export function performStuckRescue(
   flight.timeSinceBeat = 0;
   flight.flareCharge = 0;
 
-  // Clear the wall-clear streak so the next few frames start clean and
+  // Clear the wall-clear streak so the next few steps start clean and
   // don't race the throttled probe schedule.
-  col.wallClearFrames = 0;
+  col.wallClearSteps = 0;
 
   resetStuck(stuck);
 

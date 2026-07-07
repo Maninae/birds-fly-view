@@ -16,8 +16,8 @@
  */
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { AppMode, BirdPose, InputState, WorldSource } from '../types.js';
+import { armChaseCamera, armFirstPersonEye } from './cameraArm.js';
 import type { CollisionMemory } from './collision.js';
-import { unclipCamera } from './collision.js';
 import type { CraftTuning } from './craftTuning.js';
 import { headingVector } from './flight.js';
 import {
@@ -104,9 +104,18 @@ export class CameraRig {
       }
     }
 
+    // First-person eye clearance: the ~0.35 m forward offset can put the eye
+    // just inside a facade the bird itself hasn't clipped yet (COLLISION_RADIUS
+    // depenetrates the bird's centre, not this offset). Sweep from bird to
+    // target eye and pull it back on hit. Chase view uses the spring-arm on
+    // the smoothed position instead (below).
+    if (this.view === 'first') {
+      armFirstPersonEye(_pos, pose.position, world, col);
+    }
+
     // Floor the camera so it never buries in ground/roof.
-    // (The full bird→camera ray sweep in `unclipCamera` handles wall clip;
-    // this one downward ray is a cheap belt-and-braces for the vertical case.)
+    // (The chase spring-arm handles wall clip after damping; this one
+    // downward ray is a cheap belt-and-braces for the vertical case.)
     col.probeCount++;
     const beneath = world.groundBelow(_pos);
     if (beneath) {
@@ -135,13 +144,13 @@ export class CameraRig {
     const fovAlpha = 1 - Math.pow(2, -dt / FOV_HALFLIFE);
     this.smoothFov = this.smoothFov + (fovTarget - this.smoothFov) * fovAlpha;
 
-    // Final unclip: sample bird→camera ray; if any point is inside geometry,
-    // pull camera in front of the wall. Bird itself is guaranteed outside
-    // geometry (enforceGroundFloor + wallSlide), so the bird end of the ray
-    // is always a safe anchor. Only meaningful for chase / walk over-shoulder
-    // — first-person cam sits at the bird's head and skips the sweep.
+    // Final clearance: swept-sphere spring-arm in dream mode, raycast sample
+    // fallback in photo mode. Runs every render frame (no throttling), so
+    // hard turns pressed against a facade never leave a wall between the
+    // bird and the camera. First-person view has its own tiny sweep on the
+    // eye offset in `computeFirstPersonTarget` before smoothing.
     if (this.view !== 'first') {
-      unclipCamera(this.smoothPos, pose.position, world, col);
+      armChaseCamera(this.smoothPos, pose.position, world, col);
     }
 
     this.camera.position.copy(this.smoothPos);
