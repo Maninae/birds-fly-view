@@ -162,14 +162,21 @@ export class WorldSwitcher {
     if (kind === this._worldKind) return;
 
     if (kind === 'photo') {
-      if (!apiKey) {
+      // The key modal passes the key explicitly; the title/settings toggles
+      // pass nothing and rely on the stored key. Only error when NEITHER
+      // exists (the toggle UIs open the modal in that case themselves, so
+      // this toast is a belt-and-braces path).
+      const key = apiKey ?? storedGoogleKey();
+      if (!key) {
         this.ui.setError('paste a Google Maps key to enter photoreal mode.');
         return;
       }
-      try {
-        localStorage.setItem(GOOGLE_KEY_STORAGE, apiKey);
-      } catch {
-        // storage disabled — proceed anyway.
+      if (apiKey) {
+        try {
+          localStorage.setItem(GOOGLE_KEY_STORAGE, apiKey);
+        } catch {
+          // storage disabled — proceed anyway.
+        }
       }
     }
 

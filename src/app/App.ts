@@ -10,6 +10,7 @@ import {
   WebGLRenderer,
 } from 'three';
 
+import { readStoredCraft } from '../bird/craftTuning';
 import { START_ALTITUDE_M } from '../config';
 import { EnuFrame } from '../geo/mercator';
 import type {
@@ -242,7 +243,10 @@ export class App {
         void this.takeoff(point, label, headingDeg);
       },
       onWorldKind: (kind, apiKey) => {
-        void this.switcher.switchKind(kind, apiKey);
+        // Push the settings/title reflection as soon as the switch resolves.
+        // The 5Hz HUD tick only runs in flight, so a pre-takeoff toggle on
+        // the title screen would otherwise never update visually.
+        void this.switcher.switchKind(kind, apiKey).then(() => this.pushSettingsIfChanged());
       },
       onCraftSelect: (craft) => {
         // Same gates as the C-key toggle: needs a bird, active flight, and a
@@ -405,8 +409,10 @@ export class App {
    * actual current kind including any photoreal→dream fallback.
    */
   private pushSettingsIfChanged(): void {
-    if (!this.bird || !this.ui.updateSettings) return;
-    const craft = this.bird.craft;
+    if (!this.ui.updateSettings) return;
+    // Pre-takeoff there is no bird yet; the stored craft is what a takeoff
+    // would construct, so reflect that.
+    const craft = this.bird ? this.bird.craft : readStoredCraft();
     const kind = this.switcher.worldKind;
     if (craft === this.lastPushedCraft && kind === this.lastPushedWorldKind) return;
     this.lastPushedCraft = craft;
