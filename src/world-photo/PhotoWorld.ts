@@ -25,6 +25,7 @@ import { buildPhotoTiles } from './buildTiles.js';
 import { groundBelow } from './ground.js';
 import { photoAttributions } from './attribution.js';
 import { waitForInitialTiles } from './ready.js';
+import { PhotoBvhAccelerator } from './bvh.js';
 
 /** How long init() waits for tiles near origin to load before resolving anyway. */
 const INIT_TIMEOUT_MS = 8000;
@@ -50,6 +51,7 @@ export class PhotoWorld implements WorldSource {
   private readonly rayDown = new Raycaster();
 
   private tiles: TilesRenderer | null = null;
+  private bvh: PhotoBvhAccelerator | null = null;
   private camera: PerspectiveCamera | null = null;
   private renderer: WebGLRenderer | null = null;
   private disposed = false;
@@ -106,6 +108,16 @@ export class PhotoWorld implements WorldSource {
     tiles.setCamera(this.camera);
     this.root.add(tiles.group as unknown as Object3D);
 
+    // BVH acceleration for down-cast raycasts (~10x on Google tile meshes).
+    // Toggle off via `globalThis.__bfvBvhOff = true` before init() for A/B perf
+    // measurement; see debug hook below.
+    const bvhOff = (globalThis as { __bfvBvhOff?: boolean }).__bfvBvhOff === true;
+    if (!bvhOff) {
+      this.bvh = new PhotoBvhAccelerator(tiles);
+      this.bvh.attach();
+    }
+    installDebugHook(this);
+
     try {
       await waitForInitialTiles(tiles, this.camera, this.renderer, INIT_TIMEOUT_MS);
     } catch (err) {
@@ -131,6 +143,7 @@ export class PhotoWorld implements WorldSource {
     tiles.errorTarget = DETAIL_ERROR_TARGET[this.detailTier];
     tiles.setResolutionFromRenderer(this.camera, this.renderer);
     tiles.update();
+    this.bvh?.flush();
   }
 
   groundBelow(pos: Vector3, maxDist = 500): GroundHit | null {
@@ -151,13 +164,86 @@ export class PhotoWorld implements WorldSource {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.bvh) {
+      this.bvh.detach();
+      this.bvh = null;
+    }
     if (this.tiles) {
       const g = this.tiles.group as unknown as Object3D;
       if (g.parent) g.parent.remove(g);
       this.tiles.dispose();
       this.tiles = null;
     }
+    uninstallDebugHook(this);
     this.camera = null;
     this.renderer = null;
   }
+
+  // Internal accessor for the debug hook; not on WorldSource.
+  getBvhForDebug(): PhotoBvhAccelerator | null { return this.bvh; }
+}
+
+/**
+ * Debug window hook: `__bfvBvh` exposes BVH population + a groundBelow
+ * micro-benchmark that runs the raycast N times and returns median/p95
+ * microseconds. Used by the photoreal smoke test for A/B perf reporting.
+ * Idempotent — replaces itself if PhotoWorld is re-inited in the same page.
+ */
+interface BvhDebugHook {
+  bvhOff: boolean;
+  count(): number;
+  totalBuilt(): number;
+  totalDisposed(): number;
+  pending(): number;
+  sampleGroundBelow(x: number, y: number, z: number, n?: number, batches?: number): {
+    n: number; batches: number; medianUs: number; p95Us: number;
+    meanUs: number; hitRate: number;
+  };
+}
+
+const _scratchPos = new Vector3();
+
+function installDebugHook(world: PhotoWorld): void {
+  const bvhOff = (globalThis as { __bfvBvhOff?: boolean }).__bfvBvhOff === true;
+  const hook: BvhDebugHook = {
+    bvhOff,
+    count: () => world.getBvhForDebug()?.size() ?? 0,
+    totalBuilt: () => world.getBvhForDebug()?.totalBuilt() ?? 0,
+    totalDisposed: () => world.getBvhForDebug()?.totalDisposed() ?? 0,
+    pending: () => world.getBvhForDebug()?.pendingSize() ?? 0,
+    sampleGroundBelow(x, y, z, n = 200, batches = 20) {
+      // performance.now() is clamped to ~5-20us in browsers (Spectre); a
+      // single raycast reads as 0. Measure `n` calls per batch, take the
+      // wall-clock delta, divide → one mean-per-call sample. `batches`
+      // such samples give a distribution we can median/p95 over.
+      _scratchPos.set(x, y, z);
+      const perCallUs: number[] = [];
+      let totalCalls = 0;
+      let hits = 0;
+      for (let b = 0; b < batches; b++) {
+        const t0 = performance.now();
+        for (let i = 0; i < n; i++) {
+          const hit = world.groundBelow(_scratchPos);
+          if (hit) hits++;
+        }
+        const dtMs = performance.now() - t0;
+        perCallUs.push((dtMs * 1000) / n);
+        totalCalls += n;
+      }
+      perCallUs.sort((a, b) => a - b);
+      const median = perCallUs[Math.floor(perCallUs.length * 0.5)];
+      const p95 = perCallUs[Math.floor(perCallUs.length * 0.95)];
+      const mean = perCallUs.reduce((a, b) => a + b, 0) / perCallUs.length;
+      return {
+        n: totalCalls, batches, medianUs: median, p95Us: p95,
+        meanUs: mean, hitRate: hits / totalCalls,
+      };
+    },
+  };
+  (globalThis as { __bfvBvh?: BvhDebugHook }).__bfvBvh = hook;
+}
+
+function uninstallDebugHook(_world: PhotoWorld): void {
+  const g = globalThis as { __bfvBvh?: BvhDebugHook };
+  if (g.__bfvBvh) delete g.__bfvBvh;
 }

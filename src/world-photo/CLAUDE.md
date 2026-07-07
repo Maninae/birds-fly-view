@@ -16,6 +16,9 @@ ready.ts           Init-time RAF driver: pumps tiles.update() until root +
                    first model land, or an 8s timeout / auth error.
 ground.ts          Downward raycast → GroundHit.
 attribution.ts     Extract per-tile Google credits + always-on '© Google'.
+bvh.ts             three-mesh-bvh lifecycle: per-tile BVH built on
+                   `load-model`, torn down on `dispose-model`. Amortized
+                   builds under a per-frame time budget.
 ```
 
 No file is over 300 lines. Keep it that way; split further if features grow.
@@ -85,13 +88,33 @@ The App renders those strings in the attribution footer — required by
 ## Raycasting gotcha
 
 `TilesRenderer` honors `raycaster.firstHitOnly` and uses bounding-volume
-pre-filtering. For a single down-cast this is fast enough. If landing rays
-start missing despite tiles being loaded, that's the known loose-bounding-
-volume issue — set `tiles.optimizeRaycast = false` (deprecated name but still
-functional) to fall back to raw traversal of loaded meshes.
+pre-filtering. Per-tile-mesh BVH acceleration (from `bvh.ts`) makes the
+down-cast ~12x faster once the first BVH is built. `firstHitOnly = true` in
+`ground.ts` only has any effect once `acceleratedRaycast` is installed on
+those meshes.
+
+If landing rays start missing despite tiles being loaded, that's the known
+loose-bounding-volume issue — set `tiles.optimizeRaycast = false` (deprecated
+name but still functional) to fall back to raw traversal of loaded meshes.
 
 `GroundHit.kind` is always `'unknown'` — the photoreal mesh doesn't
 distinguish terrain from buildings.
+
+## BVH acceleration (`bvh.ts`)
+
+`PhotoBvhAccelerator` listens on the `TilesRenderer` for `load-model` and
+`dispose-model`. It walks each tile scene, per-mesh assigns
+`acceleratedRaycast`, and queues the mesh for BVH build. Builds drain under a
+3 ms/frame budget inside `PhotoWorld.update()` so a burst of tile loads never
+hitches. Disposes mirror the LRU cache so BVHs never accumulate dead meshes.
+
+- `computeBoundsTree`/`disposeBoundsTree` are attached to
+  `BufferGeometry.prototype` (harmless — no runtime cost unless called).
+- `acceleratedRaycast` is installed PER-MESH; dream-mode meshes never see it.
+- Toggle off with `globalThis.__bfvBvhOff = true` before `init()` for A/B
+  perf measurement.
+- Debug hook: `window.__bfvBvh.sampleGroundBelow(x, y, z, n, batches)`
+  returns median/p95/mean µs per raycast, plus BVH population counters.
 
 ## What can't be tested without a key
 
