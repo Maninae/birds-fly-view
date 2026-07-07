@@ -30,6 +30,19 @@ import type { EdgeDedupe } from './tileStreamer';
 import { WINDOW_PITCH_H_M, WINDOW_PITCH_V_M } from './windowTexture';
 
 /**
+ * Called for every extruded building BEFORE the wall-edge dedupe runs. The
+ * collision layer captures the undeduped footprint + [baseY, topY] via this
+ * sink; if omitted (world-demo dev harness, tests) the extruder is a no-op
+ * on the collision side and only the render mesh is produced.
+ */
+export type PrismSink = (
+  outer: Vector2[],
+  holes: Vector2[][],
+  baseY: number,
+  topY: number,
+) => void;
+
+/**
  * Buildings taller than this get window UVs computed from world position;
  * shorter houses get UV=(0,0) so they sample the texture's blank corner
  * and stay clean.
@@ -75,6 +88,14 @@ export function buildBuildingBuffers(
    * silently skip every wall — that's the FiDi-blank-buildings bug.
    */
   edges: EdgeDedupe,
+  /**
+   * Optional prism sink: called for every building we're about to extrude,
+   * with the SAME poly.outer / poly.holes / baseY / topY the wall emitter
+   * sees, BEFORE the dedupe drops any shared edges. The collision layer
+   * needs the full ring of every building even when the render skips a
+   * party wall — party walls still separate two SOLID prisms.
+   */
+  prismSink?: PrismSink,
 ): BuildingBufferData | null {
   // Emit walls into their own array first (every quad is exactly 4 verts,
   // so the whole wall section is naturally 4-aligned) and roofs into a
@@ -164,6 +185,11 @@ export function buildBuildingBuffers(
       wallBaseC.r = jitterColor.r * WALL_BASE_SHADE;
       wallBaseC.g = jitterColor.g * WALL_BASE_SHADE;
       wallBaseC.b = jitterColor.b * WALL_BASE_SHADE;
+
+      // Prism sink: capture the UNDEDUPED footprint + Y interval for the
+      // collision layer BEFORE emitWalls consults the dedupe. Rendering
+      // may drop shared edges; collision must not.
+      prismSink?.(poly.outer, poly.holes, baseY, topY);
 
       // Walls → wall buffers (naturally 4-aligned).
       // Party-wall dedupe here removes shared edges between neighboring OSM

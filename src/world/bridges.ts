@@ -76,6 +76,20 @@ export interface BridgeBufferData {
 }
 
 /**
+ * Optional sink for the collision layer. Called for each deck segment we
+ * build with the same `proj` / `deckY` / `halfW` values the mesh emitter
+ * uses, so the collidable box lines up with the visible deck exactly.
+ *
+ * `yBottom` = deckY - DECK_THICKNESS_M (deck underside)
+ * `yTop`    = deckY                    (deck top surface — landable)
+ */
+export type BridgeBoxSink = (
+  ax: number, az: number, bx: number, bz: number,
+  halfWidth: number,
+  yBottom: number, yTop: number,
+) => void;
+
+/**
  * Build merged bridge geometry for one tile. Returns `null` if the tile
  * has no drawable bridge features.
  */
@@ -84,6 +98,7 @@ export function buildBridgeBuffers(
   tileX: number, tileY: number, tileZ: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
+  boxSink?: BridgeBoxSink,
 ): BridgeBufferData | null {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -135,6 +150,21 @@ export function buildBridgeBuffers(
         emitDeck(proj, deckY, halfW, positions, normals, colors, indices);
         emitRailings(proj, deckY, halfW, positions, normals, colors, indices);
         emitPiers(proj, deckY, terr, positions, normals, colors, indices);
+        // Collision boxes: one swept OBB per deck segment, top face at deckY
+        // so landings land on the deck (not on top of the railing), Y span
+        // covers the deck thickness so a bird can't clip through the deck
+        // from below. Piers are deliberately skipped — they're thin verticals
+        // and the deck box is what carries the fly-under semantics.
+        if (boxSink) {
+          for (let v = 0; v < proj.length - 1; v++) {
+            const yTop = Math.max(deckY[v], deckY[v + 1]);
+            const yBottom = Math.min(deckY[v], deckY[v + 1]) - DECK_THICKNESS_M;
+            boxSink(
+              proj[v].x, proj[v].y, proj[v + 1].x, proj[v + 1].y,
+              halfW, yBottom, yTop,
+            );
+          }
+        }
         any = true;
         void waterVerts;
       }

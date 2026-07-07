@@ -8,7 +8,9 @@
  *   - a small ring of z12 Terrarium terrain-tile meshes
  *   - the shared materials + a huge "sky-sea" plane so tile seams are
  *     never visible beyond the fog radius
- *   - a Raycaster restricted to nearby BUILDING meshes for `groundBelow`
+ *   - a `WorldCollision` composed over the streamer's per-tile prism/box
+ *     payloads + the terrain heightfield; `groundBelow` and the bird's
+ *     analytic wall/roof queries flow through it
  *
  * `init(origin)` fetches the vector-tile URL template and pre-loads the
  * center ring of terrain tiles + the center vector tile before resolving,
@@ -17,10 +19,10 @@
  * WorldSwitcher generation bump) leaves nothing hanging.
  */
 import {
-  Color, Group, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D,
-  PlaneGeometry, Raycaster, Vector3,
+  Color, Group, Mesh, MeshLambertMaterial, MeshPhongMaterial,
+  PlaneGeometry, Vector3,
 } from 'three';
-import type { GeoPoint, GroundHit, WorldSource } from '../types';
+import type { CollisionQuery, GeoPoint, GroundHit, WorldSource } from '../types';
 import { ATTRIBUTION_BASE, TERRAIN_ZOOM, VECTOR_ZOOM } from '../config';
 import {
   EnuFrame, geoToTile, latToTileY, lonToTileX, tileXToLon, tileYToLat,
@@ -31,33 +33,27 @@ import { TileStreamer } from './tileStreamer';
 import { buildTilePayload } from './tileBuilder';
 import { buildTerrainMesh } from './terrainMesh';
 import { disposeWindowTexture, windowTexture } from './windowTexture';
+import { WorldCollision } from './collision';
 
 /** Half-side of the ocean plane (m). Larger than fog radius; sits at y=0. */
 const OCEAN_HALF = 40_000;
 
-/**
- * Terrain elevations at or below this threshold read as "under water" for the
- * landing-prompt logic: the Bay bathymetry decodes to ~0, dry Embarcadero
- * ground is ~2 m, so 0.4 m draws a clean line between them. Keeps the bird
- * from getting a "walk on water" prompt out over the Bay.
- */
-const WATER_ELEVATION_THRESHOLD_M = 0.4;
-
 export class StylizedWorld implements WorldSource {
   readonly root: Group;
+  /**
+   * Analytic collision surface — dream mode retains vector data so a full
+   * `CollisionQuery` is available. Consumers on the bird side branch on this
+   * (photo mode omits it, and falls back to the raycast probe path).
+   */
+  readonly collision: CollisionQuery;
 
   private frame: EnuFrame | null = null;
   private terrain = new TerrainSampler();
   private streamer: TileStreamer;
   private terrainRoot: Group;
   private terrainTiles = new Map<string, Mesh>();
-  private raycaster = new Raycaster();
-  private down = new Vector3(0, -1, 0);
   private started = false;
   private disposed = false;
-
-  // Reused scratch for the raycast filter — no per-frame allocation.
-  private buildingHitBuffer: Object3D[] = [];
 
   // Cached materials — one instance per surface type, shared across every
   // tile mesh AND (for terrain) every terrain tile.
@@ -139,6 +135,23 @@ export class StylizedWorld implements WorldSource {
       },
     );
     this.root.add(this.streamer.root);
+
+    // Compose the analytic collision query. The lambdas resolve to the
+    // current live state on each call, so re-anchoring the frame or evicting
+    // tiles just flows through — no cache to invalidate.
+    this.collision = new WorldCollision({
+      tiles: () => this.streamer.collisionTiles(),
+      frame: () => this.frame,
+      terrain: this.terrain,
+    });
+
+    // Dev-time diagnostic hook — mirror what `BirdSystem` does. Lets a
+    // headed-browser integration test probe `groundBelow` at arbitrary
+    // world points without waiting for the bird to fly there. Tree-shaken
+    // out of production builds by the DEV flag constant fold.
+    if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+      (window as unknown as { __bfvWorld?: StylizedWorld }).__bfvWorld = this;
+    }
   }
 
   async init(origin: GeoPoint): Promise<void> {
@@ -224,55 +237,18 @@ export class StylizedWorld implements WorldSource {
   }
 
   /**
-   * Nearest surface directly below `pos`.
+   * Nearest surface directly below `pos`. Delegates to the analytic
+   * collision layer: building tops and bridge decks come from per-tile
+   * prisms/boxes, terrain from the exact-mesh sampler, water suppression
+   * mirrors the pre-analytic behavior so the landing prompt over the Bay
+   * still stays silent.
    *
-   * Only building meshes are eligible for `kind:'building'` — roads, trees,
-   * water polygons, and greens are excluded. Terrain otherwise wins, unless
-   * the terrain sample reads as "under water" (elevation ≤ threshold), in
-   * which case we return null so the bird doesn't get a landing prompt out
-   * over the Bay.
+   * Bridge decks come back as `kind:'building'` so the perch/land UI treats
+   * them like rooftops (matches the intent of the P0 groundBelow fix).
    */
   groundBelow(pos: Vector3, maxDist = 500): GroundHit | null {
     if (!this.frame || this.disposed) return null;
-    const geo = this.frame.enuToGeo(pos.x, pos.z);
-
-    // Terrain height under the point (synchronous cache lookup).
-    const terrainY = this.terrain.sample(geo.lat, geo.lon);
-    const terrainDist = pos.y - terrainY;
-
-    // Building raycast — restrict to only the tagged building meshes of the
-    // nearby tiles. Roads / trees / greens / water never register.
-    const nearby = this.streamer.nearbyTiles(geo.lat, geo.lon, 1);
-    const targets = this.collectBuildingMeshes(nearby);
-    let buildingHit: { distance: number; point: Vector3; normal: Vector3 } | null = null;
-    if (targets.length) {
-      this.raycaster.set(pos, this.down);
-      this.raycaster.far = maxDist;
-      const hits = this.raycaster.intersectObjects(targets, false);
-      if (hits.length) {
-        const h = hits[0];
-        buildingHit = {
-          distance: h.distance,
-          point: h.point.clone(),
-          normal: h.normal ? h.normal.clone().normalize() : new Vector3(0, 1, 0),
-        };
-      }
-    }
-
-    // Prefer the building if the ray hits one before the ground — the small
-    // epsilon avoids a wall base "tie" reading as terrain.
-    if (buildingHit && buildingHit.distance <= terrainDist + 0.05) {
-      return { point: buildingHit.point, normal: buildingHit.normal, kind: 'building' };
-    }
-
-    // No building; decide on terrain vs open water.
-    if (terrainDist < 0 || terrainDist > maxDist) return null;
-    if (terrainY <= WATER_ELEVATION_THRESHOLD_M) return null; // over the Bay
-    return {
-      point: new Vector3(pos.x, terrainY, pos.z),
-      normal: new Vector3(0, 1, 0),
-      kind: 'terrain',
-    };
+    return this.collision.rayDown(pos.x, pos.z, pos.y, maxDist);
   }
 
   attributions(): string[] {
@@ -305,28 +281,6 @@ export class StylizedWorld implements WorldSource {
   get isStarted(): boolean { return this.started; }
 
   // ── Internals ────────────────────────────────────────────────────────────
-
-  /**
-   * Collect building-tagged meshes from a set of tile groups.
-   *
-   * The scene shape is:
-   *   tile X/Y (Group) → tile-content X/Y (Group) → [buildings Mesh, water, roads, …]
-   *
-   * so we can't just scan the tile group's direct children — the tagged
-   * mesh is a grandchild. We `.traverse` into each tile group (small
-   * subtree, ~5 nodes per tile, ~15 tiles → tiny) and pick out the tagged
-   * building meshes.
-   */
-  private collectBuildingMeshes(tileGroups: Object3D[]): Object3D[] {
-    const out = this.buildingHitBuffer;
-    out.length = 0;
-    for (const g of tileGroups) {
-      g.traverse((n) => {
-        if (n.userData?.isBuilding) out.push(n);
-      });
-    }
-    return out;
-  }
 
   private rebuildTerrainRing(lat: number, lon: number): void {
     if (!this.frame || this.disposed) return;

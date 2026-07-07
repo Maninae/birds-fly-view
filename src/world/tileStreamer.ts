@@ -19,6 +19,7 @@ import type { VectorTile } from '@mapbox/vector-tile';
 import { EnuFrame, lonToTileX, latToTileY } from '../geo/mercator';
 import { VECTOR_ZOOM } from '../config';
 import { fetchVectorTile, tileTemplate } from './vectorTile';
+import type { TileCollision } from './collision';
 
 /** Radius (in tile units) of tiles kept loaded around the camera. */
 const RING_RADIUS = 2;
@@ -39,10 +40,21 @@ export interface EdgeDedupe {
   add(k: string): unknown;
 }
 
+/**
+ * A tile builder returns the render subtree AND the analytic collision
+ * payload in one call. Either may be null when the tile has no content of
+ * that kind (a tile with roads but no buildings has a mesh and no collision;
+ * an empty tile has neither).
+ */
+export interface TileBuildResult {
+  root: Object3D | null;
+  collision: TileCollision | null;
+}
+
 export type TileBuilder = (
   tile: VectorTile, tx: number, ty: number, tz: number, frame: EnuFrame,
   edges: EdgeDedupe,
-) => Object3D | null;
+) => TileBuildResult;
 
 /**
  * Optional readiness gate for a wanted vector tile. Returns true when
@@ -63,6 +75,12 @@ interface TileEntry {
   wallEdges?: Set<string>;
   /** Decoded vector tile held while waiting for the ready gate. */
   pendingTile?: VectorTile;
+  /**
+   * Analytic collision payload — buildings + bridges as prisms/boxes with a
+   * 16x16 grid. Populated at the same moment as the render mesh, dropped in
+   * `evictTile`. Render and collision are always in sync per tile.
+   */
+  collision?: TileCollision;
 }
 
 /**
@@ -258,8 +276,9 @@ export class TileStreamer {
           add: (k) => { global.add(k); wallEdges.add(k); return dedupe; },
         };
         entry.wallEdges = wallEdges;
-        const obj = this.builder(tile, entry.tx, entry.ty, this.tz, this.frame, dedupe);
-        if (obj) entry.root.add(obj);
+        const result = this.builder(tile, entry.tx, entry.ty, this.tz, this.frame, dedupe);
+        if (result.root) entry.root.add(result.root);
+        if (result.collision) entry.collision = result.collision;
         entry.state = 'ready';
       } catch {
         entry.state = 'failed';
@@ -288,9 +307,24 @@ export class TileStreamer {
       for (const key of entry.wallEdges) this.globalEdges.delete(key);
     }
     entry.pendingTile = undefined;
+    entry.collision = undefined;
     this.disposeSubtree(entry.root);
     this.root.remove(entry.root);
     this.tiles.delete(k);
+  }
+
+  /**
+   * Snapshot of every ready tile's collision payload. Used by
+   * `WorldCollision` to iterate the loaded world. The array is fresh each
+   * call — collision queries are per-frame, so a per-frame allocation is
+   * cheaper than maintaining a live view that gets invalidated on evict.
+   */
+  collisionTiles(): TileCollision[] {
+    const out: TileCollision[] = [];
+    for (const entry of this.tiles.values()) {
+      if (entry.state === 'ready' && entry.collision) out.push(entry.collision);
+    }
+    return out;
   }
 
   private enforceCap(): void {

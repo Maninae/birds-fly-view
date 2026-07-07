@@ -18,7 +18,9 @@
 import { Vector3 } from 'three';
 import type { BirdPose, GroundHit, InputState, WorldSource } from '../types.js';
 import type { CollisionMemory, WallSlideResult } from './collision.js';
-import { enforceGroundFloor, wallLookahead, wallSlide } from './collision.js';
+import {
+  enforceGroundFloor, sweepFlightMove, wallLookahead, wallSlide,
+} from './collision.js';
 import type { CraftTuning } from './craftTuning.js';
 import {
   AUTOLEVEL_PITCH,
@@ -194,28 +196,44 @@ function advance(
   let velX = _fwd.x * horizSpeed;
   let velZ = _fwd.z * horizSpeed;
 
-  // Wall slide: 3 probes (nose + wingtips) at speed-scaled lookahead. On hit,
-  // project the horizontal velocity onto the plane perpendicular to the
-  // combined outward normal — bird skims the facade, never enters.
-  const lookahead = wallLookahead(pose.speed, dt);
-  wallSlide(pose, velX, velZ, lookahead, world, col, _slide);
-  velX = _slide.velX;
-  velZ = _slide.velZ;
-  const slidingOnWall = _slide.hit;
+  // Vertical velocity: pitch + flap memory + brake sink. LEVEL_SINK_RATE = 0
+  // by owner directive — hands-off level flight holds altitude forever.
+  let velY = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
+  if (input.brake) velY -= tuning.BRAKE_EXTRA_SINK * brakeBoost;
 
-  // Vertical velocity: purely pitch-driven + flap memory + brake sink.
-  // LEVEL_SINK_RATE = 0 by owner directive — hands-off level flight holds
-  // altitude forever, so the bird never "falls" without an input.
-  let dy = pose.speed * Math.sin(pose.pitch) - LEVEL_SINK_RATE + mem.vy;
-  if (input.brake) dy -= tuning.BRAKE_EXTRA_SINK * brakeBoost;
-  dy *= dt;
+  // Two paths, one per world kind:
+  //   dream mode has world.collision → analytic swept-sphere path replaces
+  //     the 3-probe wall probes and depenetrates on start-inside. Zero
+  //     clipping by construction; overhangs and under-bridges Just Work.
+  //   photo mode has no collision surface → raycast probe path unchanged,
+  //     preserving existing behavior on Google 3D tiles.
+  let slidingOnWall = false;
+  if (world.collision) {
+    const slid = sweepFlightMove(pose, velX, velY, velZ, tuning.COLLISION_RADIUS, world.collision, col, dt);
+    slidingOnWall = slid.hit;
+    if (slid.hit) {
+      // If we ended up sliding along a mostly-horizontal surface (roof/deck
+      // from above OR floor from below), clip the corresponding vertical
+      // velocity component so we don't push into it next frame.
+      if (slid.ny > 0.7 && mem.vy < 0) mem.vy = 0;      // sitting on a roof
+      if (slid.ny < -0.7 && mem.vy > 0) mem.vy = 0;     // pressed against ceiling
+    }
+  } else {
+    // Wall slide: 3 probes (nose + wingtips) at speed-scaled lookahead. On
+    // hit, project the horizontal velocity onto the plane perpendicular to
+    // the combined outward normal — bird skims the facade, never enters.
+    const lookahead = wallLookahead(pose.speed, dt);
+    wallSlide(pose, velX, velZ, lookahead, world, col, _slide);
+    velX = _slide.velX;
+    velZ = _slide.velZ;
+    slidingOnWall = _slide.hit;
+    pose.position.x += velX * dt;
+    pose.position.y += velY * dt;
+    pose.position.z += velZ * dt;
+  }
 
   // Decay flap-lift memory back to zero.
   mem.vy *= Math.pow(0.15, dt); // half-life ≈ 0.37 * dt inverse... quick decay
-
-  pose.position.x += velX * dt;
-  pose.position.y += dy;
-  pose.position.z += velZ * dt;
 
   // Absolute floor: pose.y is never allowed below ground + epsilon, even if
   // tiles are momentarily unloaded (falls back to last known ground).

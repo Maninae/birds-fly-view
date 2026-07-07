@@ -223,6 +223,10 @@ export class BirdSystem implements BirdSystemApi {
     this._mode = 'flying';
     this._landing = null;
     this.easeT = 0;
+    // Stale ground memory from a previous region would make enforceGroundFloor
+    // snap a teleported bird back up to the old floor.
+    this.col.lastGroundY = null;
+    this.col.lastGroundKind = null;
     this.flight.vy = 0;
     this.flight.timeSinceBeat = 999;
     this.flight.flareCharge = 0;

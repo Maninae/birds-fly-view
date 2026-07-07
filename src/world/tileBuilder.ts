@@ -17,7 +17,7 @@ import {
   MeshLambertMaterial, MeshPhongMaterial,
 } from 'three';
 import type { VectorTile } from '@mapbox/vector-tile';
-import { EnuFrame } from '../geo/mercator';
+import { EnuFrame, tileXToLon, tileYToLat } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import type { EdgeDedupe } from './tileStreamer';
 import { buildBuildingBuffers } from './buildingMesh';
@@ -26,6 +26,7 @@ import {
   buildRoadBuffers, buildWaterBuffers, buildGreenBuffers,
 } from './surfaceMesh';
 import { buildTreeInstances } from './trees';
+import { TileCollisionBuilder, type TileCollision } from './collision';
 
 export interface TileMaterials {
   buildingMat: MeshLambertMaterial;
@@ -36,7 +37,20 @@ export interface TileMaterials {
 }
 
 /**
- * Build all merged surface meshes for one tile.
+ * Result of building one tile: the render group (or null if the tile has no
+ * drawable content) plus the analytic collision payload (or null if the tile
+ * has no collidable content — same predicate as "no buildings AND no bridges").
+ * The two are always produced together so render and collision stay in sync
+ * with respect to what the streamer thinks exists.
+ */
+export interface TilePayload {
+  root: Group | null;
+  collision: TileCollision | null;
+}
+
+/**
+ * Build all merged surface meshes AND the analytic collision payload for one
+ * tile in a single pass.
  *
  * `edges` is the streamer-provided EdgeDedupe: writes go to BOTH a
  * world-global Set (so wall-edge dedupe crosses tile seams) AND a
@@ -45,8 +59,6 @@ export interface TileMaterials {
  * the neighboring tile only renders that wall once, AND if the emitting
  * tile evicts later, the neighbor can re-render its side without the
  * key being stuck "already taken".
- *
- * Returns null if the tile has no drawable content.
  */
 export function buildTilePayload(
   tile: VectorTile,
@@ -55,9 +67,20 @@ export function buildTilePayload(
   terrain: TerrainSampler,
   mats: TileMaterials,
   edges: EdgeDedupe,
-): Group | null {
+): TilePayload {
   const g = new Group();
   g.name = `tile-content ${tx}/${ty}`;
+
+  // Compute the tile's XZ box up-front so the collision builder can size its
+  // 16x16 grid. Uses the tile's geographic corners, projected through the
+  // active ENU frame.
+  const enuNW = frame.geoToEnu(tileYToLat(ty, tz), tileXToLon(tx, tz));
+  const enuSE = frame.geoToEnu(tileYToLat(ty + 1, tz), tileXToLon(tx + 1, tz));
+  const tileMinX = Math.min(enuNW.x, enuSE.x);
+  const tileMaxX = Math.max(enuNW.x, enuSE.x);
+  const tileMinZ = Math.min(enuNW.z, enuSE.z);
+  const tileMaxZ = Math.max(enuNW.z, enuSE.z);
+  const collision = new TileCollisionBuilder(tileMinX, tileMinZ, tileMaxX, tileMaxZ);
 
   const building = tile.layers.building;
   const transportation = tile.layers.transportation;
@@ -70,7 +93,12 @@ export function buildTilePayload(
   // WorldSource restrict `groundBelow`'s raycast to just these meshes,
   // so trees/roads/water/greens never register as "perchable rooftops".
   if (building) {
-    const data = buildBuildingBuffers(building, tx, ty, tz, frame, terrain, edges);
+    const data = buildBuildingBuffers(
+      building, tx, ty, tz, frame, terrain, edges,
+      (outer, holes, baseY, topY) => {
+        collision.addPrismFromV2(outer, holes, baseY, topY);
+      },
+    );
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.buildingMat);
       mesh.name = 'buildings';
@@ -127,7 +155,12 @@ export function buildTilePayload(
   // Bay Bridge, Golden Gate, and every overpass. Emitted after roads so
   // draw order is stable.
   if (transportation) {
-    const data = buildBridgeBuffers(transportation, tx, ty, tz, frame, terrain);
+    const data = buildBridgeBuffers(
+      transportation, tx, ty, tz, frame, terrain,
+      (ax, az, bx, bz, halfWidth, yBottom, yTop) => {
+        collision.addBridgeSegment(ax, az, bx, bz, halfWidth, yBottom, yTop);
+      },
+    );
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.bridgeMat);
       mesh.name = 'bridges';
@@ -146,7 +179,11 @@ export function buildTilePayload(
     }
   }
 
-  return g.children.length ? g : null;
+  const hasCollision = collision.prisms.length > 0 || collision.bridges.length > 0;
+  return {
+    root: g.children.length ? g : null,
+    collision: hasCollision ? collision.finalize() : null,
+  };
 }
 
 /** Common: attach the pre-packed typed arrays to a fresh BufferGeometry. */

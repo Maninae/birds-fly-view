@@ -47,6 +47,18 @@ export interface CraftTuning {
   // Landing window (drives both the UI prompt and E-assist swoop)
   LAND_MAX_SPEED: number;
   LAND_HEIGHT: number;
+
+  /**
+   * Sphere radius (m) for the analytic swept-sphere collision path. Sized so
+   * a clean facade graze reads as a slide, not a wall clip:
+   *   - bird ≈ 0.9 m: WINGTIP_OFFSET is 1.2 m; we pick a hair under it so a
+   *     shallow bank near a wall doesn't trigger nuisance depenetrations.
+   *   - biplane ≈ 1.6 m: matches the visible wingspan reach; the Wright-style
+   *     mesh is ~3.2 m tip-to-tip.
+   * Only consulted when `world.collision` exists (dream mode); the raycast
+   * fallback path in `bird/collision.ts` doesn't use it.
+   */
+  COLLISION_RADIUS: number;
 }
 
 /** Bird tuning — the existing tern/gull feel; mirrors the module-level defaults. */
@@ -65,6 +77,7 @@ export const BIRD_TUNING: CraftTuning = {
   BRAKE_EXTRA_SINK: 4.0,
   LAND_MAX_SPEED: 16,
   LAND_HEIGHT: 22,
+  COLLISION_RADIUS: 0.9,
 };
 
 /**
@@ -92,6 +105,7 @@ export const BIPLANE_TUNING: CraftTuning = {
   BRAKE_EXTRA_SINK: 5.0,
   LAND_MAX_SPEED: 34,
   LAND_HEIGHT: 32,
+  COLLISION_RADIUS: 1.6,
 };
 
 export function getCraftTuning(craft: CraftKind): CraftTuning {
