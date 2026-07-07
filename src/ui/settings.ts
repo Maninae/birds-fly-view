@@ -35,6 +35,8 @@ export interface SettingsHandlers {
   onInvertPitch(inverted: boolean): void;
   /** Minimap on/off toggled from the panel. Persistence is caller-owned. */
   onSetMinimap(open: boolean): void;
+  /** Place-pins on/off toggled from the panel. Persistence is caller-owned. */
+  onSetPins(on: boolean): void;
   /** Re-show the controls hint (bypasses the seen-gate). */
   onShowControls(): void;
 }
@@ -43,6 +45,7 @@ export interface SettingsState {
   craft: CraftKind;
   worldKind: WorldKind;
   minimapOpen: boolean;
+  pinsOn: boolean;
   steeringScale: number;
   invertPitch: boolean;
 }
@@ -133,6 +136,12 @@ export function createSettings(
   });
   minimapRow.appendChild(minimapSwitch.root);
 
+  const pinsRow = row('place pins');
+  const pinsSwitch = switchInput(initial.pinsOn, (on) => {
+    handlers.onSetPins(on);
+  });
+  pinsRow.appendChild(pinsSwitch.root);
+
   const controlsRow = row('controls');
   const controlsBtn = document.createElement('button');
   controlsBtn.type = 'button';
@@ -150,6 +159,7 @@ export function createSettings(
     worldRow,
     sectionHeader('interface'),
     minimapRow,
+    pinsRow,
     controlsRow,
   );
   root.append(gear, panel);

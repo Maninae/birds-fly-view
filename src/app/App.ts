@@ -25,6 +25,7 @@ import type {
 } from '../types';
 
 import { installSky } from './sky';
+import { PinsLayer } from '../world-pins/pinsLayer';
 import { WorldSwitcher } from './worldSwitcher';
 
 // Sibling module contracts — canonical implementations behind the WorldSource
@@ -60,6 +61,14 @@ function readStoredInvertPitch(): boolean {
     return localStorage.getItem(INVERT_PITCH_KEY) === '1';
   } catch {
     return false;
+  }
+}
+/** Read the persisted place-pins preference; default on. */
+function readStoredPinsOn(): boolean {
+  try {
+    return localStorage.getItem('bfv.pinsOn') !== '0';
+  } catch {
+    return true;
   }
 }
 
@@ -166,6 +175,9 @@ export class App {
   private mapFrameLon = NaN;
   private readonly mapScratch = { lat: 0, lon: 0 };
 
+  /** Floating place-label billboards; world-agnostic, anchored per takeoff. */
+  private readonly pins = new PinsLayer();
+
   constructor(opts: AppOptions) {
     this.canvas = opts.canvas;
     this.ui = opts.ui;
@@ -182,6 +194,12 @@ export class App {
     this.scene = new Scene();
     // sky handles are kept alive by the scene graph; no local reference needed.
     installSky(this.scene);
+
+    // Floating place-pins: catalog fetch starts now, positions anchor per
+    // takeoff, visibility is driven from the flying branch of loop().
+    this.scene.add(this.pins.root);
+    void this.pins.load();
+    this.pins.setEnabled(readStoredPinsOn());
 
     this.titleCamera = new PerspectiveCamera(55, 1, 0.5, 12000);
     this.titleCamera.position.set(0, 40, 120);
@@ -242,6 +260,9 @@ export class App {
         // the input factory will read the persisted flag when it constructs.
         if (this.input) this.input.invertPitch = inverted;
       },
+      onPinsToggle: (on) => {
+        this.pins.setEnabled(on);
+      },
     };
   }
 
@@ -274,6 +295,7 @@ export class App {
     const spawn = new Vector3(0, result.groundY + START_ALTITUDE_M, 0);
     const headingRad = ((headingDeg ?? 0) * Math.PI) / 180;
     this.bird.placeAt(spawn, headingRad);
+    this.pins.anchor(point);
 
     if (!this.input) {
       this.input = this.factories.input(this.canvas);
@@ -323,6 +345,7 @@ export class App {
       }
       this.updateLandingPrompt();
       this.pushMinimap();
+      this.pins.update(this.bird.camera.position, world, dt);
       this.renderer.render(this.scene, this.bird.camera);
       this.input.endFrame();
     } else {
@@ -422,6 +445,7 @@ export class App {
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     window.removeEventListener('resize', this.handleResize);
     this.input?.dispose();
+    this.pins.dispose();
     this.switcher.dispose();
     this.renderer.dispose();
   }

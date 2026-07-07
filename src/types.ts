@@ -153,6 +153,8 @@ export interface UiHooks {
    * the C-key toggle, and drops the request if either isn't ready yet.
    */
   onCraftSelect(craft: CraftKind): void;
+  /** Settings-panel place-pins toggle. App shows/hides the pins layer. */
+  onPinsToggle(on: boolean): void;
   /**
    * Settings-panel steering-rate slider (0.4..1.6). App forwards to
    * `bird.setSteeringScale` when a bird exists; the UI also persists the

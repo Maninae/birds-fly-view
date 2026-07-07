@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "note": "Floating place-pins. tier 1 = city (far visible), 2 = district/park/landmark, 3 = local POI. Aggregated from a 20-region curation sweep; regenerate via the pins workflow.",
+  "pins": [
+    { "name": "San Francisco", "lat": 37.7793, "lon": -122.4193, "kind": "city", "tier": 1 },
+    { "name": "Oakland", "lat": 37.8044, "lon": -122.2712, "kind": "city", "tier": 1 },
+    { "name": "Berkeley", "lat": 37.8715, "lon": -122.273, "kind": "city", "tier": 1 },
+    { "name": "San Jose", "lat": 37.3382, "lon": -121.8863, "kind": "city", "tier": 1 },
+    { "name": "Golden Gate Park", "lat": 37.7694, "lon": -122.4862, "kind": "park", "tier": 2 },
+    { "name": "Ferry Building", "lat": 37.7955, "lon": -122.3937, "kind": "landmark", "tier": 2 },
+    { "name": "Coit Tower", "lat": 37.8024, "lon": -122.4058, "kind": "landmark", "tier": 2 },
+    { "name": "Oracle Park", "lat": 37.7786, "lon": -122.3893, "kind": "stadium", "tier": 2 },
+    { "name": "Tartine Bakery", "lat": 37.7614, "lon": -122.4241, "kind": "restaurant", "tier": 3 },
+    { "name": "Mission Dolores Park", "lat": 37.7596, "lon": -122.4269, "kind": "park", "tier": 3 }
+  ]
+}

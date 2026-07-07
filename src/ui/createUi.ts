@@ -29,12 +29,30 @@ export interface CreateUiOptions {
  * localStorage keys the UI owns directly.
  *
  * `bfv.minimapOpen`   — '1' | '0'. Default ON when absent.
+ * `bfv.pinsOn`        — '1' | '0'. Default ON when absent.
  * `bfv.steeringScale` — float string 0.4..1.6 (e.g. "1.25"). Default 1.
  * `bfv.invertPitch`   — '1' | '0'. Default OFF (direct convention).
  */
 const MINIMAP_PREF_KEY = 'bfv.minimapOpen';
+const PINS_PREF_KEY = 'bfv.pinsOn';
 const STEERING_SCALE_KEY = 'bfv.steeringScale';
 const INVERT_PITCH_KEY = 'bfv.invertPitch';
+
+/** Place-pins preference; default ON. */
+function readPinsPref(): boolean {
+  try {
+    return localStorage.getItem(PINS_PREF_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+function writePinsPref(on: boolean): void {
+  try {
+    localStorage.setItem(PINS_PREF_KEY, on ? '1' : '0');
+  } catch {
+    // storage disabled — pref is session-only.
+  }
+}
 
 function readMinimapPref(): boolean {
   try {
@@ -164,6 +182,10 @@ export function createUi(opts: CreateUiOptions): UiApi {
         writeMinimapPref(open);
         refreshMinimap();
       },
+      onSetPins(on) {
+        writePinsPref(on);
+        opts.hooks.onPinsToggle(on);
+      },
       onShowControls() {
         controlsHint.showNow();
       },
@@ -172,6 +194,7 @@ export function createUi(opts: CreateUiOptions): UiApi {
       craft: lastCraft,
       worldKind: lastWorldKind,
       minimapOpen: minimapPref,
+      pinsOn: readPinsPref(),
       steeringScale: readSteeringScale(),
       invertPitch: readInvertPitch(),
     },
