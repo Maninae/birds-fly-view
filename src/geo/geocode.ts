@@ -53,12 +53,21 @@ export async function searchAddress(query: string): Promise<GeocodeResult[]> {
   if (!res.ok) throw new Error(`geocoder responded ${res.status}`);
   const json = (await res.json()) as PhotonResponse;
 
-  return json.features
+  const results = json.features
     .filter((f) => Array.isArray(f.geometry?.coordinates) && f.geometry.coordinates.length === 2)
     .map((f) => {
       const [lon, lat] = f.geometry.coordinates;
       return { lat, lon, label: buildLabel(f.properties) };
     });
+  // Photon often returns several segments of the same street as separate
+  // features with identical labels (three "Broadway, San Francisco" rows the
+  // user cannot tell apart). Keep the first of each label.
+  const seen = new Set<string>();
+  return results.filter((r) => {
+    if (seen.has(r.label)) return false;
+    seen.add(r.label);
+    return true;
+  });
 }
 
 /**

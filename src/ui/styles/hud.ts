@@ -131,6 +131,11 @@ export const HUD_CSS = /* css */ `
     font-family: var(--bfv-font-sans);
     font-size: 10px;
     color: var(--bfv-ink-muted);
+    /* Parchment halo keeps the license-required credits legible over any
+       world brightness without adding a panel. */
+    text-shadow:
+      0 0 6px rgba(247, 240, 225, 0.9),
+      0 0 2px rgba(247, 240, 225, 0.95);
     line-height: 1.5;
     text-align: right;
     max-width: min(48vw, 340px);

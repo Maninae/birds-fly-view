@@ -2,7 +2,9 @@
  * HUD: place label (top-center), single readout line (bottom-center),
  * and a mode chip when perched/walking. All whisper-thin.
  *
- * Fades after 4 s of no change; any HUD push or mousemove brings it back.
+ * Fade behavior: wakes on any content change or mousemove, fades after 4 s of
+ * stillness. In flight the readout changes every ~200 ms push, so it stays
+ * visible by design; the fade only lands when perched/idle.
  */
 import type { HudState } from '../types';
 

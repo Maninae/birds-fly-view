@@ -128,6 +128,10 @@ export const TITLE_CSS = /* css */ `
     width: calc(100% - 40px);
     text-align: center;
     padding: 18px 24px 20px;
+    /* Short viewports: cap to the viewport and scroll inside the panel
+       instead of clipping the wordmark/footer off both ends. */
+    max-height: 100vh;
+    overflow-y: auto;
   }
 
   .bfv-wordmark {
@@ -308,7 +312,8 @@ export const TITLE_CSS = /* css */ `
     border-radius: 999px;
     white-space: nowrap;
     box-shadow: 0 1px 4px rgba(58, 55, 48, 0.16);
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
   }
   /* Placement variants shift the tag in a compass direction from the dot.
      Marker is zero-size at the exact geo point, so each variant offsets

@@ -84,6 +84,17 @@ export function createTitleMap(handlers: TitleMapHandlers): TitleMapHandle {
     const tag = document.createElement('span');
     tag.className = 'bfv-title-tag';
     tag.textContent = preset.label;
+    // The tag is a click target too: without this, a click on the label text
+    // falls through to the click-anywhere layer and takes off at the LABEL's
+    // screen position, kilometers from the preset on the bbox scale.
+    tag.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      handlers.onSelect(
+        { lat: preset.lat, lon: preset.lon },
+        preset.label,
+        preset.headingDeg,
+      );
+    });
 
     marker.append(dot, tag);
     root.appendChild(marker);

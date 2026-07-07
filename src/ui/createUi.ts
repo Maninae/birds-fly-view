@@ -225,6 +225,9 @@ export function createUi(opts: CreateUiOptions): UiApi {
     }
     searchButton.setVisible(false);
     settings.setGearVisible(false);
+    // The first-flight hint would otherwise float above the veil until its
+    // own timer elapses.
+    controlsHint.hide();
   };
   const closeTitle = (): void => {
     titleOpen = false;

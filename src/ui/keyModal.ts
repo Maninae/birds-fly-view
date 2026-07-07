@@ -64,8 +64,19 @@ export function createKeyModal(handlers: KeyModalHandlers): KeyModalHandle {
     // storage disabled — leave blank
   }
 
+  // Escape closes without change (same semantics as a scrim click). Capture
+  // phase so it preempts the createUi Escape handler, which would otherwise
+  // also toggle the mid-flight veil on the same keypress.
+  const onEscape = (ev: KeyboardEvent): void => {
+    if (ev.key !== 'Escape') return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    close();
+  };
+
   const close = (): void => {
     scrim.style.display = 'none';
+    window.removeEventListener('keydown', onEscape, true);
   };
 
   saveBtn.addEventListener('click', () => {
@@ -92,6 +103,7 @@ export function createKeyModal(handlers: KeyModalHandlers): KeyModalHandle {
     root: scrim,
     open() {
       scrim.style.display = 'flex';
+      window.addEventListener('keydown', onEscape, true);
       setTimeout(() => input.focus({ preventScroll: true }), 40);
     },
     close,

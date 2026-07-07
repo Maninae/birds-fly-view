@@ -14,6 +14,8 @@ export interface ControlsHintHandle {
   showOnce(): void;
   /** Bypass the "seen" gate — used by the settings panel's re-show button. */
   showNow(): void;
+  /** Hide immediately — used when the mid-flight veil opens over it. */
+  hide(): void;
   dispose(): void;
 }
 
@@ -58,6 +60,11 @@ export function createControlsHint(): ControlsHintHandle {
     },
     showNow() {
       startFade();
+    },
+    hide() {
+      if (timer !== null) clearTimeout(timer);
+      root.style.opacity = '0';
+      root.style.display = 'none';
     },
     dispose() {
       if (timer !== null) clearTimeout(timer);
