@@ -1,16 +1,5515 @@
 {
-  "version": 1,
-  "note": "Floating place-pins. tier 1 = city (far visible), 2 = district/park/landmark, 3 = local POI. Aggregated from a 20-region curation sweep; regenerate via the pins workflow.",
-  "pins": [
-    { "name": "San Francisco", "lat": 37.7793, "lon": -122.4193, "kind": "city", "tier": 1 },
-    { "name": "Oakland", "lat": 37.8044, "lon": -122.2712, "kind": "city", "tier": 1 },
-    { "name": "Berkeley", "lat": 37.8715, "lon": -122.273, "kind": "city", "tier": 1 },
-    { "name": "San Jose", "lat": 37.3382, "lon": -121.8863, "kind": "city", "tier": 1 },
-    { "name": "Golden Gate Park", "lat": 37.7694, "lon": -122.4862, "kind": "park", "tier": 2 },
-    { "name": "Ferry Building", "lat": 37.7955, "lon": -122.3937, "kind": "landmark", "tier": 2 },
-    { "name": "Coit Tower", "lat": 37.8024, "lon": -122.4058, "kind": "landmark", "tier": 2 },
-    { "name": "Oracle Park", "lat": 37.7786, "lon": -122.3893, "kind": "stadium", "tier": 2 },
-    { "name": "Tartine Bakery", "lat": 37.7614, "lon": -122.4241, "kind": "restaurant", "tier": 3 },
-    { "name": "Mission Dolores Park", "lat": 37.7596, "lon": -122.4269, "kind": "park", "tier": 3 }
-  ]
+ "version": 1,
+ "note": "Floating place-pins. tier 1 = city/major airport (far visible), 2 = district/park/landmark, 3 = local POI. Aggregated from a 25-agent curation sweep (20 regions + South Bay/airports/malls focus); regenerate via the pins workflows.",
+ "pins": [
+  {
+   "name": "Alameda",
+   "lat": 37.7647,
+   "lon": -122.2417,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Alamo",
+   "lat": 37.8507,
+   "lon": -122.0324,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Albany",
+   "lat": 37.8869,
+   "lon": -122.2977,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Atherton",
+   "lat": 37.4602,
+   "lon": -122.1985,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Belmont",
+   "lat": 37.5202,
+   "lon": -122.2758,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Belvedere",
+   "lat": 37.8724,
+   "lon": -122.464,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Benicia",
+   "lat": 38.0494,
+   "lon": -122.1583,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Berkeley",
+   "lat": 37.8716,
+   "lon": -122.2727,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Brisbane",
+   "lat": 37.6801,
+   "lon": -122.3991,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Burlingame",
+   "lat": 37.5844,
+   "lon": -122.3651,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Campbell",
+   "lat": 37.2872,
+   "lon": -121.9491,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Castro Valley",
+   "lat": 37.6941,
+   "lon": -122.0863,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Clayton",
+   "lat": 37.9367,
+   "lon": -121.9271,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Colma",
+   "lat": 37.6779,
+   "lon": -122.4595,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Concord",
+   "lat": 37.978,
+   "lon": -122.0311,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Corte Madera",
+   "lat": 37.9257,
+   "lon": -122.5241,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Crockett",
+   "lat": 38.0524,
+   "lon": -122.2264,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Cupertino",
+   "lat": 37.3229,
+   "lon": -122.0322,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Daly City",
+   "lat": 37.6858,
+   "lon": -122.4666,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Danville",
+   "lat": 37.8216,
+   "lon": -121.9994,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "East Palo Alto",
+   "lat": 37.4687,
+   "lon": -122.1466,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "El Cerrito",
+   "lat": 37.9161,
+   "lon": -122.3113,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "El Granada",
+   "lat": 37.503,
+   "lon": -122.4681,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "El Sobrante",
+   "lat": 37.9761,
+   "lon": -122.2942,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Fairfax",
+   "lat": 37.9871,
+   "lon": -122.5888,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Foster City",
+   "lat": 37.5585,
+   "lon": -122.2711,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Fremont",
+   "lat": 37.5486,
+   "lon": -121.9886,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Half Moon Bay",
+   "lat": 37.4636,
+   "lon": -122.4286,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Hayward",
+   "lat": 37.6688,
+   "lon": -122.081,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Hercules",
+   "lat": 38.0172,
+   "lon": -122.2886,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Hillsborough",
+   "lat": 37.5602,
+   "lon": -122.3572,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Lafayette",
+   "lat": 37.8858,
+   "lon": -122.118,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Larkspur",
+   "lat": 37.9345,
+   "lon": -122.5348,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Los Altos",
+   "lat": 37.3854,
+   "lon": -122.1141,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Los Altos Hills",
+   "lat": 37.38,
+   "lon": -122.1387,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Los Gatos",
+   "lat": 37.2265,
+   "lon": -121.9805,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Menlo Park",
+   "lat": 37.4527,
+   "lon": -122.183,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Mill Valley",
+   "lat": 37.906,
+   "lon": -122.5449,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Millbrae",
+   "lat": 37.5985,
+   "lon": -122.3872,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Milpitas",
+   "lat": 37.4331,
+   "lon": -121.9013,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Montara",
+   "lat": 37.5424,
+   "lon": -122.5058,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Monte Sereno",
+   "lat": 37.2377,
+   "lon": -121.9948,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Moraga",
+   "lat": 37.8349,
+   "lon": -122.1297,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Moss Beach",
+   "lat": 37.5233,
+   "lon": -122.5136,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Mountain View",
+   "lat": 37.3894,
+   "lon": -122.0819,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Newark",
+   "lat": 37.5296,
+   "lon": -122.0402,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Novato",
+   "lat": 38.1074,
+   "lon": -122.5697,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Oakland",
+   "lat": 37.8053,
+   "lon": -122.272,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Oakland Intl (OAK)",
+   "lat": 37.7213,
+   "lon": -122.221,
+   "kind": "airport",
+   "tier": 1
+  },
+  {
+   "name": "Pacifica",
+   "lat": 37.6137,
+   "lon": -122.487,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Palo Alto",
+   "lat": 37.4443,
+   "lon": -122.161,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Piedmont",
+   "lat": 37.8244,
+   "lon": -122.2319,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Pinole",
+   "lat": 38.0053,
+   "lon": -122.2989,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Pleasant Hill",
+   "lat": 37.948,
+   "lon": -122.0608,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Portola Valley",
+   "lat": 37.3843,
+   "lon": -122.2364,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Redwood City",
+   "lat": 37.4852,
+   "lon": -122.2364,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Richmond",
+   "lat": 37.9358,
+   "lon": -122.3477,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Rodeo",
+   "lat": 38.0324,
+   "lon": -122.2664,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Ross",
+   "lat": 37.9624,
+   "lon": -122.5555,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "SFO",
+   "lat": 37.6213,
+   "lon": -122.379,
+   "kind": "airport",
+   "tier": 1
+  },
+  {
+   "name": "San Anselmo",
+   "lat": 37.9746,
+   "lon": -122.5613,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Bruno",
+   "lat": 37.6316,
+   "lon": -122.4108,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Carlos",
+   "lat": 37.5072,
+   "lon": -122.2605,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.7793,
+   "lon": -122.4193,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Jose",
+   "lat": 37.3382,
+   "lon": -121.8863,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Jose Mineta (SJC)",
+   "lat": 37.3639,
+   "lon": -121.9289,
+   "kind": "airport",
+   "tier": 1
+  },
+  {
+   "name": "San Leandro",
+   "lat": 37.7249,
+   "lon": -122.1561,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Lorenzo",
+   "lat": 37.6813,
+   "lon": -122.1247,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Mateo",
+   "lat": 37.563,
+   "lon": -122.3255,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Pablo",
+   "lat": 37.9628,
+   "lon": -122.3455,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "San Rafael",
+   "lat": 37.9735,
+   "lon": -122.5311,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Santa Clara",
+   "lat": 37.3549,
+   "lon": -121.9686,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Saratoga",
+   "lat": 37.2638,
+   "lon": -122.03,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Sausalito",
+   "lat": 37.8591,
+   "lon": -122.4853,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "South San Francisco",
+   "lat": 37.6547,
+   "lon": -122.4082,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Sunnyvale",
+   "lat": 37.3775,
+   "lon": -122.0311,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Tiburon",
+   "lat": 37.8735,
+   "lon": -122.4569,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Union City",
+   "lat": 37.5934,
+   "lon": -122.0438,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Vallejo",
+   "lat": 38.1041,
+   "lon": -122.2566,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Walnut Creek",
+   "lat": 37.9061,
+   "lon": -122.0654,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Woodside",
+   "lat": 37.4297,
+   "lon": -122.254,
+   "kind": "city",
+   "tier": 1
+  },
+  {
+   "name": "Adams Point",
+   "lat": 37.8121,
+   "lon": -122.2565,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Albany Bulb",
+   "lat": 37.8905,
+   "lon": -122.3195,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Almaden Lake Park",
+   "lat": 37.2325,
+   "lon": -121.8676,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Almaden Valley",
+   "lat": 37.2178,
+   "lon": -121.8564,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Alpine Lake",
+   "lat": 37.9187,
+   "lon": -122.6115,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Alum Rock District",
+   "lat": 37.3688,
+   "lon": -121.8286,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Alum Rock Park",
+   "lat": 37.3986,
+   "lon": -121.7967,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Alviso",
+   "lat": 37.4267,
+   "lon": -121.976,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Alviso Marina Park",
+   "lat": 37.4327,
+   "lon": -121.977,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Anthony Chabot Park",
+   "lat": 37.744,
+   "lon": -122.113,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Apple Infinite Loop",
+   "lat": 37.3319,
+   "lon": -122.0307,
+   "kind": "office",
+   "tier": 2
+  },
+  {
+   "name": "Apple Park",
+   "lat": 37.3349,
+   "lon": -122.009,
+   "kind": "office",
+   "tier": 2
+  },
+  {
+   "name": "Apple Park Visitor Ctr",
+   "lat": 37.3323,
+   "lon": -122.0068,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Arastradero Preserve",
+   "lat": 37.3944,
+   "lon": -122.1665,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Archbishop Mitty HS",
+   "lat": 37.3146,
+   "lon": -121.9931,
+   "kind": "school",
+   "tier": 2
+  },
+  {
+   "name": "Ardenwood Farm",
+   "lat": 37.5641,
+   "lon": -122.0577,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Ardenwood Historic Farm",
+   "lat": 37.5561,
+   "lon": -122.0498,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Arrowhead Marsh",
+   "lat": 37.7365,
+   "lon": -122.2075,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Ashland",
+   "lat": 37.6949,
+   "lon": -122.1136,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Asian Art Museum",
+   "lat": 37.7802,
+   "lon": -122.4163,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "BAMPFA",
+   "lat": 37.8709,
+   "lon": -122.266,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Baker Beach",
+   "lat": 37.7936,
+   "lon": -122.4836,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Battery Spencer",
+   "lat": 37.8299,
+   "lon": -122.483,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Bay Farm Island",
+   "lat": 37.7385,
+   "lon": -122.2601,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bay Meadows",
+   "lat": 37.5386,
+   "lon": -122.3006,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bay Model Visitor Ctr",
+   "lat": 37.8637,
+   "lon": -122.4914,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Bay Point",
+   "lat": 38.0293,
+   "lon": -121.9662,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bayview",
+   "lat": 37.73,
+   "lon": -122.39,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bayview Opera House",
+   "lat": 37.7358,
+   "lon": -122.3924,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Bellarmine College Prep",
+   "lat": 37.3425,
+   "lon": -121.9179,
+   "kind": "school",
+   "tier": 2
+  },
+  {
+   "name": "Benicia Capitol",
+   "lat": 38.0475,
+   "lon": -122.1583,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Benicia State Rec Area",
+   "lat": 38.0692,
+   "lon": -122.1953,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Berkeley Lab",
+   "lat": 37.8759,
+   "lon": -122.2504,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Berkeley Marina",
+   "lat": 37.8665,
+   "lon": -122.317,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Berkeley Rose Garden",
+   "lat": 37.8862,
+   "lon": -122.2648,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Bernal Heights",
+   "lat": 37.7395,
+   "lon": -122.4155,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bernal Hill",
+   "lat": 37.7433,
+   "lon": -122.4143,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Berryessa",
+   "lat": 37.3862,
+   "lon": -121.8479,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bird Refuge",
+   "lat": 37.8073,
+   "lon": -122.2568,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Blackhawk",
+   "lat": 37.8155,
+   "lon": -121.913,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Blackhawk Museum",
+   "lat": 37.8194,
+   "lon": -121.9339,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Blackie's Pasture",
+   "lat": 37.885,
+   "lon": -122.4788,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Blossom Valley",
+   "lat": 37.245,
+   "lon": -121.85,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Bothin Marsh",
+   "lat": 37.8815,
+   "lon": -122.5177,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Branham High School",
+   "lat": 37.258,
+   "lon": -121.8895,
+   "kind": "school",
+   "tier": 2
+  },
+  {
+   "name": "Broadmoor",
+   "lat": 37.6878,
+   "lon": -122.479,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Broadway Plaza",
+   "lat": 37.8988,
+   "lon": -122.0596,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Buchanan Field Airport",
+   "lat": 37.9897,
+   "lon": -122.0567,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "Buena Vista Park",
+   "lat": 37.7686,
+   "lon": -122.4416,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "CEFCU Stadium",
+   "lat": 37.3197,
+   "lon": -121.8677,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Cable Car Museum",
+   "lat": 37.7948,
+   "lon": -122.4114,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Cal Academy of Sciences",
+   "lat": 37.7699,
+   "lon": -122.4661,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Cal Maritime Academy",
+   "lat": 38.0699,
+   "lon": -122.2313,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Cal State East Bay",
+   "lat": 37.6579,
+   "lon": -122.0576,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Cambrian Park",
+   "lat": 37.2569,
+   "lon": -121.9224,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Canada College",
+   "lat": 37.4622,
+   "lon": -122.2745,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Candlestick Point",
+   "lat": 37.715,
+   "lon": -122.383,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Cantor Arts Center",
+   "lat": 37.4324,
+   "lon": -122.1704,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Carquinez Bridge",
+   "lat": 38.0603,
+   "lon": -122.2262,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Castro",
+   "lat": 37.7609,
+   "lon": -122.435,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Castro Theatre",
+   "lat": 37.762,
+   "lon": -122.4349,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Cathedral Basilica",
+   "lat": 37.3345,
+   "lon": -121.8907,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Cathedral of Christ Light",
+   "lat": 37.8098,
+   "lon": -122.2636,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Cavallo Point",
+   "lat": 37.8383,
+   "lon": -122.4772,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Centerville",
+   "lat": 37.5568,
+   "lon": -121.9843,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Central Park Santa Clara",
+   "lat": 37.3422,
+   "lon": -121.9752,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Cesar Chavez Park",
+   "lat": 37.8697,
+   "lon": -122.3178,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Chabot College",
+   "lat": 37.6444,
+   "lon": -122.103,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Cherryland",
+   "lat": 37.6788,
+   "lon": -122.1027,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Chevron Richmond Refinery",
+   "lat": 37.9297,
+   "lon": -122.3608,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Children's Discovery Museum",
+   "lat": 37.3305,
+   "lon": -121.8934,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Children's Fairyland",
+   "lat": 37.8098,
+   "lon": -122.2597,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "China Camp State Park",
+   "lat": 38.006,
+   "lon": -122.487,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Chinatown",
+   "lat": 37.7967,
+   "lon": -122.2695,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Chinatown Gate",
+   "lat": 37.7908,
+   "lon": -122.4056,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "City College SF",
+   "lat": 37.7255,
+   "lon": -122.452,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Cliff House",
+   "lat": 37.7784,
+   "lon": -122.5137,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Coast Guard Island",
+   "lat": 37.7776,
+   "lon": -122.2489,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Coit Tower",
+   "lat": 37.8024,
+   "lon": -122.4058,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Cole Valley",
+   "lat": 37.7655,
+   "lon": -122.4508,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "College of San Mateo",
+   "lat": 37.5354,
+   "lon": -122.3363,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Communications Hill",
+   "lat": 37.2905,
+   "lon": -121.8546,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Computer History Museum",
+   "lat": 37.4145,
+   "lon": -122.0776,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Concord Pavilion",
+   "lat": 37.9316,
+   "lon": -121.9327,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Conservatory of Flowers",
+   "lat": 37.7721,
+   "lon": -122.4602,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Corona Heights Park",
+   "lat": 37.7654,
+   "lon": -122.4383,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Cox Stadium",
+   "lat": 37.7215,
+   "lon": -122.4808,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Coyote Hills",
+   "lat": 37.5533,
+   "lon": -122.0873,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Crab Cove",
+   "lat": 37.7683,
+   "lon": -122.2807,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Crissy Field",
+   "lat": 37.8036,
+   "lon": -122.465,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Crown Beach",
+   "lat": 37.7594,
+   "lon": -122.2716,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Crystal Springs Reservoir",
+   "lat": 37.5237,
+   "lon": -122.3595,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "De Anza College",
+   "lat": 37.3196,
+   "lon": -122.0466,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Deer Island Preserve",
+   "lat": 38.1064,
+   "lon": -122.5464,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Diablo Foothills Park",
+   "lat": 37.8833,
+   "lon": -121.952,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Diablo Valley College",
+   "lat": 37.9694,
+   "lon": -122.0706,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Diridon Station",
+   "lat": 37.3294,
+   "lon": -121.9026,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "Dolores Park",
+   "lat": 37.7596,
+   "lon": -122.4269,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Dominican University",
+   "lat": 37.9789,
+   "lon": -122.5094,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Don Castro Rec Area",
+   "lat": 37.6767,
+   "lon": -122.0459,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Don Edwards NWR",
+   "lat": 37.5152,
+   "lon": -122.0664,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Downtown Campbell",
+   "lat": 37.2872,
+   "lon": -121.95,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Downtown Oakland",
+   "lat": 37.8043,
+   "lon": -122.2712,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Duboce Triangle",
+   "lat": 37.7681,
+   "lon": -122.4321,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Ed Levin County Park",
+   "lat": 37.4666,
+   "lon": -121.8569,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Edenvale",
+   "lat": 37.25,
+   "lon": -121.795,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Edgewood Park",
+   "lat": 37.4693,
+   "lon": -122.2833,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Excelsior",
+   "lat": 37.7237,
+   "lon": -122.4359,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Fairview",
+   "lat": 37.658,
+   "lon": -122.043,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Falafel Drive-In",
+   "lat": 37.3237,
+   "lon": -121.9351,
+   "kind": "restaurant",
+   "tier": 2
+  },
+  {
+   "name": "Ferry Building",
+   "lat": 37.7955,
+   "lon": -122.3937,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Filoli Estate",
+   "lat": 37.4699,
+   "lon": -122.3145,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Financial District",
+   "lat": 37.7946,
+   "lon": -122.3999,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Fisherman's Wharf",
+   "lat": 37.808,
+   "lon": -122.4177,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Fitzgerald Marine Rsv",
+   "lat": 37.5238,
+   "lon": -122.5175,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Foothill College",
+   "lat": 37.3617,
+   "lon": -122.1284,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Foothills Preserve",
+   "lat": 37.3684,
+   "lon": -122.1857,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Forest Hill",
+   "lat": 37.7455,
+   "lon": -122.464,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Fort Baker",
+   "lat": 37.8384,
+   "lon": -122.4736,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Fort Funston",
+   "lat": 37.7156,
+   "lon": -122.503,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Fort Point",
+   "lat": 37.8104,
+   "lon": -122.477,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Fourth Street",
+   "lat": 37.872,
+   "lon": -122.3005,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Fox Theater",
+   "lat": 37.8083,
+   "lon": -122.2703,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Fremont Older Preserve",
+   "lat": 37.2988,
+   "lon": -122.0621,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Fruitvale",
+   "lat": 37.7776,
+   "lon": -122.2246,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "GG Bridge Vista",
+   "lat": 37.833,
+   "lon": -122.4776,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "GG National Cemetery",
+   "lat": 37.6353,
+   "lon": -122.4231,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Garin Regional Park",
+   "lat": 37.636,
+   "lon": -122.0338,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Ghirardelli Square",
+   "lat": 37.8058,
+   "lon": -122.4229,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Glen Canyon Park",
+   "lat": 37.7398,
+   "lon": -122.4415,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Glen Park",
+   "lat": 37.7338,
+   "lon": -122.4335,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Gnoss Field Novato",
+   "lat": 38.1436,
+   "lon": -122.5556,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Golden Gate Bridge",
+   "lat": 37.8078,
+   "lon": -122.475,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Golden Gate Park",
+   "lat": 37.7694,
+   "lon": -122.4862,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Googleplex",
+   "lat": 37.422,
+   "lon": -122.0841,
+   "kind": "office",
+   "tier": 2
+  },
+  {
+   "name": "Gourmet Ghetto",
+   "lat": 37.8802,
+   "lon": -122.2687,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Grand Lake",
+   "lat": 37.8117,
+   "lon": -122.2483,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Grand Lake Theater",
+   "lat": 37.8118,
+   "lon": -122.2472,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Great America",
+   "lat": 37.3963,
+   "lon": -121.975,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Great Mall",
+   "lat": 37.4153,
+   "lon": -121.8979,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Guadalupe River Park",
+   "lat": 37.34,
+   "lon": -121.9016,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "HMB State Beach",
+   "lat": 37.4642,
+   "lon": -122.4488,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Haight-Ashbury",
+   "lat": 37.7699,
+   "lon": -122.4481,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Hakone Gardens",
+   "lat": 37.2532,
+   "lon": -122.0428,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Half Moon Bay Airport",
+   "lat": 37.5136,
+   "lon": -122.5011,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Hamilton Field",
+   "lat": 38.0505,
+   "lon": -122.508,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Hangar One",
+   "lat": 37.4118,
+   "lon": -122.0499,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Happy Hollow Park & Zoo",
+   "lat": 37.3251,
+   "lon": -121.8611,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Happy Hollow Zoo",
+   "lat": 37.3214,
+   "lon": -121.8594,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Hawk Hill",
+   "lat": 37.8262,
+   "lon": -122.5001,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Hayes Mansion",
+   "lat": 37.2477,
+   "lon": -121.8018,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Hayes Valley",
+   "lat": 37.7768,
+   "lon": -122.4245,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Hayward City Hall",
+   "lat": 37.6699,
+   "lon": -122.0808,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Hayward Executive",
+   "lat": 37.6592,
+   "lon": -122.1216,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Hayward Executive Airport",
+   "lat": 37.6592,
+   "lon": -122.1216,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "Hayward Historical Museum",
+   "lat": 37.6754,
+   "lon": -122.0844,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Hayward Shoreline",
+   "lat": 37.6291,
+   "lon": -122.1305,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Heather Farm Park",
+   "lat": 37.9192,
+   "lon": -122.0503,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Hilltop",
+   "lat": 37.9739,
+   "lon": -122.3311,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "History Park San Jose",
+   "lat": 37.3234,
+   "lon": -121.8637,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Homestead Valley",
+   "lat": 37.8817,
+   "lon": -122.539,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Hoover Tower",
+   "lat": 37.4275,
+   "lon": -122.1664,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Huddart Park",
+   "lat": 37.4472,
+   "lon": -122.2745,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Hunters Point",
+   "lat": 37.729,
+   "lon": -122.3735,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Indian Rock Park",
+   "lat": 37.8916,
+   "lon": -122.2724,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Ingleside",
+   "lat": 37.7217,
+   "lon": -122.457,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Inner Richmond",
+   "lat": 37.7793,
+   "lon": -122.465,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Inner Sunset",
+   "lat": 37.7635,
+   "lon": -122.467,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Intel Museum",
+   "lat": 37.3878,
+   "lon": -121.9639,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Irvington",
+   "lat": 37.5203,
+   "lon": -121.9647,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Jack London Square",
+   "lat": 37.7946,
+   "lon": -122.2778,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Japanese Gardens",
+   "lat": 37.6668,
+   "lon": -122.0912,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Japanese Tea Garden",
+   "lat": 37.7702,
+   "lon": -122.4703,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Japantown SJ",
+   "lat": 37.3494,
+   "lon": -121.8944,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Kaiser Santa Clara",
+   "lat": 37.3358,
+   "lon": -121.9992,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Kelley Park",
+   "lat": 37.3232,
+   "lon": -121.8631,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Kennedy Grove",
+   "lat": 37.9525,
+   "lon": -122.2892,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Kennedy Park",
+   "lat": 37.6449,
+   "lon": -122.08,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Kensington",
+   "lat": 37.9078,
+   "lon": -122.2789,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Kezar Stadium",
+   "lat": 37.7669,
+   "lon": -122.4535,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Ladera",
+   "lat": 37.4088,
+   "lon": -122.22,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Lake Anza",
+   "lat": 37.8951,
+   "lon": -122.247,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Lake Chabot",
+   "lat": 37.725,
+   "lon": -122.1039,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Lake Elizabeth",
+   "lat": 37.541,
+   "lon": -121.982,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Lake Merced",
+   "lat": 37.728,
+   "lon": -122.493,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Lake Merritt",
+   "lat": 37.8017,
+   "lon": -122.2583,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Lakeshore",
+   "lat": 37.8065,
+   "lon": -122.2481,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Lakeside Park",
+   "lat": 37.811,
+   "lon": -122.2609,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Lands End",
+   "lat": 37.7834,
+   "lon": -122.5064,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Larkspur Ferry Terminal",
+   "lat": 37.9463,
+   "lon": -122.5064,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "Las Trampas Wilderness",
+   "lat": 37.8194,
+   "lon": -122.0508,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Lawrence Hall of Science",
+   "lat": 37.8794,
+   "lon": -122.2465,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Legion of Honor",
+   "lat": 37.7841,
+   "lon": -122.5005,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Leland High School",
+   "lat": 37.2247,
+   "lon": -121.8843,
+   "kind": "school",
+   "tier": 2
+  },
+  {
+   "name": "Lesher Center",
+   "lat": 37.8979,
+   "lon": -122.0625,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Levi's Stadium",
+   "lat": 37.4032,
+   "lon": -121.9694,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Lime Ridge Open Space",
+   "lat": 37.95,
+   "lon": -121.97,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Linda Mar",
+   "lat": 37.5928,
+   "lon": -122.4869,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Linda Mar Beach",
+   "lat": 37.5949,
+   "lon": -122.4996,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Livermore Municipal",
+   "lat": 37.6934,
+   "lon": -121.8203,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Los Altos History Museum",
+   "lat": 37.3778,
+   "lon": -122.1145,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Los Gatos Creek Park",
+   "lat": 37.2661,
+   "lon": -121.9484,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "MLK Jr Shoreline",
+   "lat": 37.7411,
+   "lon": -122.2054,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Mare Island",
+   "lat": 38.0894,
+   "lon": -122.2698,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Marin City",
+   "lat": 37.8686,
+   "lon": -122.5077,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Marin Civic Center",
+   "lat": 38.021,
+   "lon": -122.5323,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Marin Headlands",
+   "lat": 37.828,
+   "lon": -122.5,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Marin Islands NWR",
+   "lat": 37.9662,
+   "lon": -122.4695,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Marina Village",
+   "lat": 37.7772,
+   "lon": -122.2717,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Marinwood",
+   "lat": 38.0421,
+   "lon": -122.548,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Martial Cottle Park",
+   "lat": 37.2649,
+   "lon": -121.8352,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Mavericks Surf Break",
+   "lat": 37.4934,
+   "lon": -122.4998,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "McInnis Park",
+   "lat": 38.0384,
+   "lon": -122.5227,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "McLaren Park",
+   "lat": 37.718,
+   "lon": -122.42,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "McNears Beach",
+   "lat": 37.9944,
+   "lon": -122.447,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Meek Mansion",
+   "lat": 37.6931,
+   "lon": -122.1155,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Memorial Stadium",
+   "lat": 37.8707,
+   "lon": -122.2508,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Menlo College",
+   "lat": 37.4589,
+   "lon": -122.2007,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Merritt College",
+   "lat": 37.7745,
+   "lon": -122.1568,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Milagra Ridge",
+   "lat": 37.6394,
+   "lon": -122.4907,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Mission District",
+   "lat": 37.7599,
+   "lon": -122.4148,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Mission Dolores",
+   "lat": 37.7642,
+   "lon": -122.427,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mission Peak",
+   "lat": 37.5127,
+   "lon": -121.8802,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Mission San Jose",
+   "lat": 37.5341,
+   "lon": -121.9198,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mission San Rafael",
+   "lat": 37.974,
+   "lon": -122.5314,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Moffett Federal Airfield",
+   "lat": 37.4161,
+   "lon": -122.0497,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Moffett Field",
+   "lat": 37.4108,
+   "lon": -122.048,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Morcom Rose Garden",
+   "lat": 37.8177,
+   "lon": -122.2506,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Mori Point",
+   "lat": 37.6049,
+   "lon": -122.4923,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Moscone Center",
+   "lat": 37.7841,
+   "lon": -122.4009,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mount Davidson",
+   "lat": 37.7378,
+   "lon": -122.4547,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mountain View Cemetery",
+   "lat": 37.8354,
+   "lon": -122.2451,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Mountain Winery",
+   "lat": 37.2496,
+   "lon": -122.0619,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mt Diablo State Park",
+   "lat": 37.83,
+   "lon": -121.9294,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Mt Diablo Summit",
+   "lat": 37.8817,
+   "lon": -121.9142,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Mt Tam East Peak",
+   "lat": 37.9236,
+   "lon": -122.5804,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Muir Beach",
+   "lat": 37.8615,
+   "lon": -122.576,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Muir Woods",
+   "lat": 37.8955,
+   "lon": -122.5719,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Municipal Rose Garden",
+   "lat": 37.3363,
+   "lon": -121.9138,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Music Concourse",
+   "lat": 37.7702,
+   "lon": -122.4676,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Mussel Rock Park",
+   "lat": 37.6688,
+   "lon": -122.4941,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "NASA Ames",
+   "lat": 37.4093,
+   "lon": -122.0642,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "NUMU Los Gatos",
+   "lat": 37.2274,
+   "lon": -121.9788,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Netflix HQ",
+   "lat": 37.2549,
+   "lon": -121.9646,
+   "kind": "office",
+   "tier": 2
+  },
+  {
+   "name": "Nike Missile Site SF-88",
+   "lat": 37.8279,
+   "lon": -122.5304,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Niles",
+   "lat": 37.5793,
+   "lon": -121.986,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Niles District",
+   "lat": 37.5761,
+   "lon": -121.9791,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Nob Hill",
+   "lat": 37.793,
+   "lon": -122.4143,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Noe Valley",
+   "lat": 37.7509,
+   "lon": -122.4335,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "North Beach",
+   "lat": 37.8005,
+   "lon": -122.4108,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Northgate Mall",
+   "lat": 38.0158,
+   "lon": -122.5321,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Notre Dame Namur Univ",
+   "lat": 37.5202,
+   "lon": -122.2947,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Oakland Arena",
+   "lat": 37.7503,
+   "lon": -122.2033,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Oakland Coliseum",
+   "lat": 37.7516,
+   "lon": -122.2005,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Oakland Int'l Airport",
+   "lat": 37.7213,
+   "lon": -122.221,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "Oakland Museum (OMCA)",
+   "lat": 37.7975,
+   "lon": -122.2637,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Oakland Zoo",
+   "lat": 37.7502,
+   "lon": -122.1497,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Oakridge Mall",
+   "lat": 37.2478,
+   "lon": -121.8637,
+   "kind": "mall",
+   "tier": 2
+  },
+  {
+   "name": "Ocean Beach",
+   "lat": 37.77,
+   "lon": -122.5107,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Ohlone College",
+   "lat": 37.5578,
+   "lon": -121.9204,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Old Mill Park",
+   "lat": 37.9058,
+   "lon": -122.5477,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Old Mountain View",
+   "lat": 37.3908,
+   "lon": -122.073,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Old Oakland",
+   "lat": 37.802,
+   "lon": -122.2725,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Oracle Park",
+   "lat": 37.7786,
+   "lon": -122.3893,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Outer Richmond",
+   "lat": 37.7772,
+   "lon": -122.493,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Pacific Commons",
+   "lat": 37.5023,
+   "lon": -121.9765,
+   "kind": "mall",
+   "tier": 2
+  },
+  {
+   "name": "Palace of Fine Arts",
+   "lat": 37.8029,
+   "lon": -122.4484,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Palo Alto Airport",
+   "lat": 37.4611,
+   "lon": -122.115,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Palo Alto Baylands",
+   "lat": 37.4595,
+   "lon": -122.1102,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Pantoll Station",
+   "lat": 37.9032,
+   "lon": -122.6042,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Paramount Theatre",
+   "lat": 37.8092,
+   "lon": -122.2688,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "PayPal Park",
+   "lat": 37.3508,
+   "lon": -121.9247,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Peacock Gap",
+   "lat": 37.9803,
+   "lon": -122.4703,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Piedmont Avenue",
+   "lat": 37.8283,
+   "lon": -122.2489,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Piedmont Park",
+   "lat": 37.8231,
+   "lon": -122.2364,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Pier 39",
+   "lat": 37.8087,
+   "lon": -122.4098,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Pillar Point Harbor",
+   "lat": 37.5029,
+   "lon": -122.4829,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Pioneer High School",
+   "lat": 37.25,
+   "lon": -121.8779,
+   "kind": "school",
+   "tier": 2
+  },
+  {
+   "name": "Plaza de Cesar Chavez",
+   "lat": 37.332,
+   "lon": -121.8894,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Point Isabel",
+   "lat": 37.901,
+   "lon": -122.3235,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Point Montara Light",
+   "lat": 37.5372,
+   "lon": -122.5183,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Point Pinole Shoreline",
+   "lat": 38.008,
+   "lon": -122.363,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Point Richmond",
+   "lat": 37.9214,
+   "lon": -122.3819,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Port Costa",
+   "lat": 38.0464,
+   "lon": -122.1878,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Portola",
+   "lat": 37.7275,
+   "lon": -122.4085,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Potrero Hill",
+   "lat": 37.7605,
+   "lon": -122.4001,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Presidio of SF",
+   "lat": 37.7989,
+   "lon": -122.4662,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Pulgas Water Temple",
+   "lat": 37.5192,
+   "lon": -122.3398,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Quarry Lakes",
+   "lat": 37.5762,
+   "lon": -121.993,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Rancho San Antonio",
+   "lat": 37.335,
+   "lon": -122.087,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Randall Museum",
+   "lat": 37.7649,
+   "lon": -122.4374,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Redwood Shores",
+   "lat": 37.53,
+   "lon": -122.25,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Reid-Hillview Airport",
+   "lat": 37.3329,
+   "lon": -121.8194,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "Ring Mountain",
+   "lat": 37.9074,
+   "lon": -122.4867,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Rivermark",
+   "lat": 37.3987,
+   "lon": -121.9648,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Rockaway Beach",
+   "lat": 37.6023,
+   "lon": -122.4949,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Rockridge",
+   "lat": 37.8446,
+   "lon": -122.2519,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Rodeo Beach",
+   "lat": 37.832,
+   "lon": -122.5401,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Rosicrucian Museum",
+   "lat": 37.334,
+   "lon": -121.9226,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Rossmoor",
+   "lat": 37.8747,
+   "lon": -122.0797,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Russian Hill",
+   "lat": 37.8014,
+   "lon": -122.4181,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Ruth Bancroft Garden",
+   "lat": 37.9257,
+   "lon": -122.0439,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "SAP Center",
+   "lat": 37.3327,
+   "lon": -121.901,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "SF State University",
+   "lat": 37.7241,
+   "lon": -122.4801,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "SF Zoo",
+   "lat": 37.7325,
+   "lon": -122.5031,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "SFMOMA",
+   "lat": 37.7857,
+   "lon": -122.4011,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "SFO Airport",
+   "lat": 37.6213,
+   "lon": -122.379,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "SJ Municipal Rose Garden",
+   "lat": 37.3318,
+   "lon": -121.9287,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "SJ Museum of Art",
+   "lat": 37.3339,
+   "lon": -121.8905,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "SJC Airport",
+   "lat": 37.3626,
+   "lon": -121.9291,
+   "kind": "transit",
+   "tier": 2
+  },
+  {
+   "name": "SJSU",
+   "lat": 37.3352,
+   "lon": -121.8811,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "SLAC Accelerator",
+   "lat": 37.4184,
+   "lon": -122.2036,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "SM County Fairgrounds",
+   "lat": 37.5433,
+   "lon": -122.312,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Saint Mary's College",
+   "lat": 37.8404,
+   "lon": -122.1082,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Salesforce Tower",
+   "lat": 37.7897,
+   "lon": -122.3972,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Samuel Merritt Univ",
+   "lat": 37.818,
+   "lon": -122.2645,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "San Bruno Mountain",
+   "lat": 37.6879,
+   "lon": -122.4353,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "San Carlos Airport",
+   "lat": 37.5119,
+   "lon": -122.2495,
+   "kind": "airport",
+   "tier": 2
+  },
+  {
+   "name": "San Jose City College",
+   "lat": 37.3158,
+   "lon": -121.9262,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "San Quentin Prison",
+   "lat": 37.9464,
+   "lon": -122.487,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Sanborn County Park",
+   "lat": 37.2379,
+   "lon": -122.0797,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Sand Hill Road",
+   "lat": 37.4212,
+   "lon": -122.2088,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Santa Clara University",
+   "lat": 37.3494,
+   "lon": -121.9394,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Santa Teresa",
+   "lat": 37.22,
+   "lon": -121.81,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Santa Teresa Co. Park",
+   "lat": 37.21,
+   "lon": -121.783,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Santana Row",
+   "lat": 37.3208,
+   "lon": -121.9484,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sather Tower",
+   "lat": 37.8721,
+   "lon": -122.2578,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Sea Cliff",
+   "lat": 37.7856,
+   "lon": -122.4929,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sharon Heights",
+   "lat": 37.4262,
+   "lon": -122.2245,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sharp Park",
+   "lat": 37.628,
+   "lon": -122.487,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sharp Park Beach",
+   "lat": 37.6295,
+   "lon": -122.4903,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Shell Ridge Open Space",
+   "lat": 37.885,
+   "lon": -122,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Shinn Historic Park",
+   "lat": 37.5586,
+   "lon": -121.9908,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Shoreline Amphitheatre",
+   "lat": 37.4267,
+   "lon": -122.0806,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Shoreline Lake",
+   "lat": 37.4275,
+   "lon": -122.0762,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Shoreline Park",
+   "lat": 37.4166,
+   "lon": -122.079,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Sign Hill Park",
+   "lat": 37.6605,
+   "lon": -122.4149,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Six Flags Discovery K.",
+   "lat": 38.1389,
+   "lon": -122.2331,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Skyline College",
+   "lat": 37.6553,
+   "lon": -122.4677,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "SoFA District",
+   "lat": 37.3299,
+   "lon": -121.8862,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Solano Ave",
+   "lat": 37.8908,
+   "lon": -122.2827,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Southland Mall",
+   "lat": 37.6329,
+   "lon": -122.0813,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "St. Francis Wood",
+   "lat": 37.734,
+   "lon": -122.468,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Stanford Main Quad",
+   "lat": 37.4275,
+   "lon": -122.1697,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Stanford Shopping Ctr",
+   "lat": 37.4437,
+   "lon": -122.1712,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Stanford Stadium",
+   "lat": 37.4348,
+   "lon": -122.1611,
+   "kind": "stadium",
+   "tier": 2
+  },
+  {
+   "name": "Stern Grove",
+   "lat": 37.735,
+   "lon": -122.482,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Stevens Creek Reservoir",
+   "lat": 37.2879,
+   "lon": -122.0724,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Stow Lake",
+   "lat": 37.7691,
+   "lon": -122.4756,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Strawberry",
+   "lat": 37.8908,
+   "lon": -122.5062,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sulphur Creek Nature Ctr",
+   "lat": 37.6668,
+   "lon": -122.071,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Sunnyvale Baylands Park",
+   "lat": 37.4192,
+   "lon": -122.011,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Sunset District",
+   "lat": 37.7495,
+   "lon": -122.495,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Sutro Baths",
+   "lat": 37.7803,
+   "lon": -122.5137,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Sweeney Ridge",
+   "lat": 37.6316,
+   "lon": -122.464,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Tam Valley",
+   "lat": 37.8776,
+   "lon": -122.5391,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Tanforan",
+   "lat": 37.6339,
+   "lon": -122.4207,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Telegraph Ave",
+   "lat": 37.8664,
+   "lon": -122.2585,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Temescal",
+   "lat": 37.8355,
+   "lon": -122.2624,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Tenderloin",
+   "lat": 37.7834,
+   "lon": -122.4145,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Tennessee Valley",
+   "lat": 37.8595,
+   "lon": -122.5361,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Terra Linda",
+   "lat": 38.0148,
+   "lon": -122.5407,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Tesla Fremont Factory",
+   "lat": 37.4938,
+   "lon": -121.9407,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "The Dish",
+   "lat": 37.4083,
+   "lon": -122.1793,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "The Panhandle",
+   "lat": 37.7717,
+   "lon": -122.4488,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "The Pruneyard",
+   "lat": 37.2917,
+   "lon": -121.9433,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "The Tech Interactive",
+   "lat": 37.3316,
+   "lon": -121.8906,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Tilden Regional Park",
+   "lat": 37.893,
+   "lon": -122.245,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Touro University CA",
+   "lat": 38.0776,
+   "lon": -122.2664,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Transamerica Pyramid",
+   "lat": 37.7952,
+   "lon": -122.4028,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Tribune Tower",
+   "lat": 37.8006,
+   "lon": -122.2704,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Twin Peaks",
+   "lat": 37.7519,
+   "lon": -122.4472,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "UC Berkeley",
+   "lat": 37.8719,
+   "lon": -122.2585,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "UC Botanical Garden",
+   "lat": 37.8752,
+   "lon": -122.2385,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "UC Law SF",
+   "lat": 37.7813,
+   "lon": -122.416,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "USF Campus",
+   "lat": 37.7766,
+   "lon": -122.4507,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "USS Hornet Museum",
+   "lat": 37.7724,
+   "lon": -122.302,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "Union Square",
+   "lat": 37.788,
+   "lon": -122.4074,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Uptown",
+   "lat": 37.8106,
+   "lon": -122.2685,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Valley Fair Mall",
+   "lat": 37.3247,
+   "lon": -121.9457,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Vasona Lake Park",
+   "lat": 37.2456,
+   "lon": -121.9723,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Villa Montalvo",
+   "lat": 37.2478,
+   "lon": -122.0526,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Visitacion Valley",
+   "lat": 37.715,
+   "lon": -122.4085,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Warm Springs",
+   "lat": 37.4924,
+   "lon": -121.9346,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "West Portal",
+   "lat": 37.7404,
+   "lon": -122.4666,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "West Valley College",
+   "lat": 37.262,
+   "lon": -122.0088,
+   "kind": "university",
+   "tier": 2
+  },
+  {
+   "name": "Westfield SF Centre",
+   "lat": 37.7841,
+   "lon": -122.4076,
+   "kind": "mall",
+   "tier": 2
+  },
+  {
+   "name": "Westfield Valley Fair",
+   "lat": 37.3251,
+   "lon": -121.9425,
+   "kind": "mall",
+   "tier": 2
+  },
+  {
+   "name": "Westgate Center",
+   "lat": 37.2927,
+   "lon": -121.9927,
+   "kind": "mall",
+   "tier": 2
+  },
+  {
+   "name": "Westlake",
+   "lat": 37.6797,
+   "lon": -122.49,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Wildcat Canyon Park",
+   "lat": 37.935,
+   "lon": -122.2911,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Willow Glen",
+   "lat": 37.308,
+   "lon": -121.8965,
+   "kind": "neighborhood",
+   "tier": 2
+  },
+  {
+   "name": "Winchester Mystery House",
+   "lat": 37.3186,
+   "lon": -121.9508,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "Windy Hill Open Space",
+   "lat": 37.381,
+   "lon": -122.2529,
+   "kind": "nature",
+   "tier": 2
+  },
+  {
+   "name": "Wunderlich Park",
+   "lat": 37.4265,
+   "lon": -122.2658,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Yerba Buena Gardens",
+   "lat": 37.7853,
+   "lon": -122.4025,
+   "kind": "park",
+   "tier": 2
+  },
+  {
+   "name": "Zuckerberg SF General",
+   "lat": 37.7559,
+   "lon": -122.4056,
+   "kind": "landmark",
+   "tier": 2
+  },
+  {
+   "name": "de Young Museum",
+   "lat": 37.7715,
+   "lon": -122.4687,
+   "kind": "museum",
+   "tier": 2
+  },
+  {
+   "name": "12th St BART",
+   "lat": 37.8034,
+   "lon": -122.2716,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "16th St Mission BART",
+   "lat": 37.7649,
+   "lon": -122.4198,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "19th St BART",
+   "lat": 37.8082,
+   "lon": -122.2685,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "24th St Mission BART",
+   "lat": 37.7522,
+   "lon": -122.4184,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Acalanes High",
+   "lat": 37.8925,
+   "lon": -122.1352,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Adobe HQ",
+   "lat": 37.3305,
+   "lon": -121.8931,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Alameda High",
+   "lat": 37.7623,
+   "lon": -122.2455,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Alameda Theatre",
+   "lat": 37.7644,
+   "lon": -122.2429,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Albany High School",
+   "lat": 37.8865,
+   "lon": -122.3005,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Alcatraz Landing",
+   "lat": 37.8079,
+   "lon": -122.4083,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Alemany Farmers Market",
+   "lat": 37.722,
+   "lon": -122.418,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Alpine Inn",
+   "lat": 37.4055,
+   "lon": -122.2222,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "American High",
+   "lat": 37.5518,
+   "lon": -122.0193,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Anchor Brewing",
+   "lat": 37.7602,
+   "lon": -122.4059,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Applied Materials",
+   "lat": 37.3862,
+   "lon": -121.997,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Archie Williams HS",
+   "lat": 37.9822,
+   "lon": -122.5722,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Backesto Park",
+   "lat": 37.3495,
+   "lon": -121.8969,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Balboa HS",
+   "lat": 37.7229,
+   "lon": -122.4432,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Balboa Park BART",
+   "lat": 37.7217,
+   "lon": -122.4478,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Balmy Alley Murals",
+   "lat": 37.75,
+   "lon": -122.4128,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Barbara's Fish Trap",
+   "lat": 37.5039,
+   "lon": -122.4844,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Basque Cultural Center",
+   "lat": 37.6538,
+   "lon": -122.4139,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Bay Fair BART",
+   "lat": 37.6972,
+   "lon": -122.1263,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Bay Street Emeryville",
+   "lat": 37.8377,
+   "lon": -122.2937,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Bayshore Caltrain",
+   "lat": 37.7094,
+   "lon": -122.4014,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Beach Chalet",
+   "lat": 37.7695,
+   "lon": -122.5107,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Bellarmine Prep",
+   "lat": 37.3405,
+   "lon": -121.9127,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Belmont Caltrain",
+   "lat": 37.5209,
+   "lon": -122.2757,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Benicia Historical Museum",
+   "lat": 38.0631,
+   "lon": -122.1631,
+   "kind": "museum",
+   "tier": 3
+  },
+  {
+   "name": "Berkeley High School",
+   "lat": 37.8697,
+   "lon": -122.2724,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Berryessa BART",
+   "lat": 37.3686,
+   "lon": -121.8747,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Bill's Cafe",
+   "lat": 37.3096,
+   "lon": -121.9014,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "BioMarin HQ",
+   "lat": 37.9679,
+   "lon": -122.5314,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Bishop O'Dowd HS",
+   "lat": 37.7635,
+   "lon": -122.1395,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Blackberry Farm",
+   "lat": 37.3132,
+   "lon": -122.0568,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Blossom Hill Caltrain",
+   "lat": 37.2528,
+   "lon": -121.7969,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Blue Rock Springs Park",
+   "lat": 38.1194,
+   "lon": -122.1867,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Bort Meadow",
+   "lat": 37.7573,
+   "lon": -122.1252,
+   "kind": "nature",
+   "tier": 3
+  },
+  {
+   "name": "Boudin Bakery",
+   "lat": 37.8081,
+   "lon": -122.4157,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Buck Institute",
+   "lat": 38.0577,
+   "lon": -122.5432,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Buck's of Woodside",
+   "lat": 37.4297,
+   "lon": -122.256,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Buckeye Roadhouse",
+   "lat": 37.8951,
+   "lon": -122.5322,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Buena Vista Cafe",
+   "lat": 37.8058,
+   "lon": -122.4207,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Buffalo Bill's Brewery",
+   "lat": 37.6773,
+   "lon": -122.0819,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Burlingame Ave",
+   "lat": 37.5793,
+   "lon": -122.3459,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Burlingame Caltrain",
+   "lat": 37.5799,
+   "lon": -122.3452,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "CCA SF Campus",
+   "lat": 37.7663,
+   "lon": -122.4048,
+   "kind": "university",
+   "tier": 3
+  },
+  {
+   "name": "California Ave Caltrain",
+   "lat": 37.4295,
+   "lon": -122.142,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Campolindo High",
+   "lat": 37.8481,
+   "lon": -122.1235,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Capitol Station",
+   "lat": 37.2843,
+   "lon": -121.8353,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Casa Peralta",
+   "lat": 37.7202,
+   "lon": -122.1595,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Castilleja School",
+   "lat": 37.4397,
+   "lon": -122.1499,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Castro Muni Station",
+   "lat": 37.762,
+   "lon": -122.4351,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Castro Valley BART",
+   "lat": 37.6907,
+   "lon": -122.0754,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Castro Valley High",
+   "lat": 37.6996,
+   "lon": -122.0721,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Centerville Station",
+   "lat": 37.5583,
+   "lon": -121.9868,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Chabot Golf Course",
+   "lat": 37.7412,
+   "lon": -122.1319,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Chef Chu's",
+   "lat": 37.4076,
+   "lon": -122.1086,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Chez Panisse",
+   "lat": 37.8801,
+   "lon": -122.2691,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Cisco HQ",
+   "lat": 37.4173,
+   "lon": -121.9294,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "City Lights Bookstore",
+   "lat": 37.7975,
+   "lon": -122.4066,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Civic Park",
+   "lat": 37.9034,
+   "lon": -122.0587,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Clorox HQ",
+   "lat": 37.8025,
+   "lon": -122.2715,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Coliseum BART",
+   "lat": 37.7538,
+   "lon": -122.1969,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "College Park Caltrain",
+   "lat": 37.3468,
+   "lon": -121.9134,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "College of Marin",
+   "lat": 37.9552,
+   "lon": -122.5533,
+   "kind": "university",
+   "tier": 3
+  },
+  {
+   "name": "Colma BART",
+   "lat": 37.6844,
+   "lon": -122.4661,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Concord BART",
+   "lat": 37.9736,
+   "lon": -122.0298,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Contra Costa College",
+   "lat": 37.9767,
+   "lon": -122.3453,
+   "kind": "university",
+   "tier": 3
+  },
+  {
+   "name": "Cooley Landing Park",
+   "lat": 37.4761,
+   "lon": -122.1121,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Cottle Station",
+   "lat": 37.2481,
+   "lon": -121.8092,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Cuesta Park",
+   "lat": 37.3768,
+   "lon": -122.0663,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Cupertino High",
+   "lat": 37.3187,
+   "lon": -122.0111,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Cupertino High School",
+   "lat": 37.321,
+   "lon": -122.0095,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Del Monte Park",
+   "lat": 37.312,
+   "lon": -121.913,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Dio Deka",
+   "lat": 37.2287,
+   "lon": -121.9774,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Don Edwards SF Bay NWR",
+   "lat": 37.5028,
+   "lon": -122.0533,
+   "kind": "nature",
+   "tier": 3
+  },
+  {
+   "name": "Downtown Berkeley BART",
+   "lat": 37.87,
+   "lon": -122.268,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Downtown Campbell VTA",
+   "lat": 37.287,
+   "lon": -121.9459,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Duboce Park",
+   "lat": 37.7692,
+   "lon": -122.4342,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Dutch Windmill",
+   "lat": 37.7708,
+   "lon": -122.5106,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Eastridge Center",
+   "lat": 37.3225,
+   "lon": -121.8123,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Edenvale Station",
+   "lat": 37.2591,
+   "lon": -121.8006,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "El Camino Hospital",
+   "lat": 37.3735,
+   "lon": -122.077,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "El Cerrito Del Norte BART",
+   "lat": 37.9256,
+   "lon": -122.317,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "El Cerrito Plaza BART",
+   "lat": 37.9028,
+   "lon": -122.2989,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "El Farolito",
+   "lat": 37.7522,
+   "lon": -122.4188,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Electronic Arts HQ",
+   "lat": 37.5195,
+   "lon": -122.2564,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Elmhurst",
+   "lat": 37.757,
+   "lon": -122.1735,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Embarcadero BART",
+   "lat": 37.7929,
+   "lon": -122.3971,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Emma Prusch Farm Park",
+   "lat": 37.34,
+   "lon": -121.8547,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Empress Theatre",
+   "lat": 38.1023,
+   "lon": -122.2581,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Encinal HS",
+   "lat": 37.7593,
+   "lon": -122.2839,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Eugene O'Neill NHS",
+   "lat": 37.8168,
+   "lon": -121.9853,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Falafel's Drive-In",
+   "lat": 37.3214,
+   "lon": -121.9247,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Fatapple's",
+   "lat": 37.8896,
+   "lon": -122.2828,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Fentons Creamery",
+   "lat": 37.8275,
+   "lon": -122.2482,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Foreign Cinema",
+   "lat": 37.7568,
+   "lon": -122.4185,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Fox Theatre RWC",
+   "lat": 37.4852,
+   "lon": -122.2293,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Franklin Square",
+   "lat": 37.7616,
+   "lon": -122.4054,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Fremont BART",
+   "lat": 37.5575,
+   "lon": -121.9764,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Fremont HS",
+   "lat": 37.3466,
+   "lon": -122.04,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Fruitvale BART",
+   "lat": 37.7748,
+   "lon": -122.2242,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Genentech HQ",
+   "lat": 37.6597,
+   "lon": -122.3961,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Gilead Sciences",
+   "lat": 37.5477,
+   "lon": -122.2604,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Glen Cove Vallejo",
+   "lat": 38.0708,
+   "lon": -122.2117,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Glen Park BART",
+   "lat": 37.7331,
+   "lon": -122.434,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Google Bay View",
+   "lat": 37.4247,
+   "lon": -122.0714,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Grace Cathedral",
+   "lat": 37.7921,
+   "lon": -122.4132,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Grandview Park",
+   "lat": 37.7532,
+   "lon": -122.4762,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Guadalupe Oak Grove",
+   "lat": 37.2222,
+   "lon": -121.857,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Gunn High",
+   "lat": 37.4054,
+   "lon": -122.1487,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "HMB Airport",
+   "lat": 37.5136,
+   "lon": -122.5013,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "HMB High School",
+   "lat": 37.4674,
+   "lon": -122.4318,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "HP Palo Alto",
+   "lat": 37.4108,
+   "lon": -122.1443,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Harbor Bay Ferry",
+   "lat": 37.7275,
+   "lon": -122.2519,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Hayward Amtrak",
+   "lat": 37.6389,
+   "lon": -122.0864,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Hayward BART",
+   "lat": 37.6702,
+   "lon": -122.0879,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Hayward High School",
+   "lat": 37.6822,
+   "lon": -122.0836,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Hayward Muni Golf",
+   "lat": 37.656,
+   "lon": -122.0688,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Henry's Hi-Life",
+   "lat": 37.3383,
+   "lon": -121.8963,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Heron's Head Park",
+   "lat": 37.7364,
+   "lon": -122.3743,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Hillsdale Caltrain",
+   "lat": 37.535,
+   "lon": -122.301,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Hillsdale Shopping Ctr",
+   "lat": 37.5396,
+   "lon": -122.302,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Hippie Hill",
+   "lat": 37.7691,
+   "lon": -122.4576,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Homestead High School",
+   "lat": 37.335,
+   "lon": -122.0425,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Internet Archive",
+   "lat": 37.7822,
+   "lon": -122.4712,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Intuit HQ",
+   "lat": 37.4133,
+   "lon": -122.0672,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Irvington High",
+   "lat": 37.5195,
+   "lon": -121.9709,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Jack London Amtrak",
+   "lat": 37.7952,
+   "lon": -122.2751,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "James Logan High",
+   "lat": 37.5942,
+   "lon": -122.0509,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Jefferson High School",
+   "lat": 37.6785,
+   "lon": -122.4787,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Joe's of Westlake",
+   "lat": 37.6866,
+   "lon": -122.4863,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "John's Grill",
+   "lat": 37.7861,
+   "lon": -122.4079,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Kaiser Permanente HQ",
+   "lat": 37.8093,
+   "lon": -122.2665,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Kaiser SL Med Ctr",
+   "lat": 37.7169,
+   "lon": -122.1608,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "La Taqueria",
+   "lat": 37.7509,
+   "lon": -122.4181,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Lafayette BART",
+   "lat": 37.8934,
+   "lon": -122.1242,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Lake Cunningham Park",
+   "lat": 37.3364,
+   "lon": -121.7997,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Lake Merritt BART",
+   "lat": 37.7973,
+   "lon": -122.2653,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Lam Research",
+   "lat": 37.5158,
+   "lon": -121.9375,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Las Palmas Park",
+   "lat": 37.3593,
+   "lon": -122.0331,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Laurel Heights",
+   "lat": 37.786,
+   "lon": -122.4468,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Levi's Plaza",
+   "lat": 37.8014,
+   "lon": -122.4009,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Lincoln HS",
+   "lat": 37.7469,
+   "lon": -122.4808,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Lincoln High School",
+   "lat": 37.307,
+   "lon": -121.9018,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "LinkedIn HQ",
+   "lat": 37.4232,
+   "lon": -122.045,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Live Oak Park",
+   "lat": 37.8817,
+   "lon": -122.2705,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Loch Lomond Marina",
+   "lat": 37.9694,
+   "lon": -122.4796,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Lombard Crooked St",
+   "lat": 37.8021,
+   "lon": -122.4187,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Lone Mountain",
+   "lat": 37.7796,
+   "lon": -122.453,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Los Altos HS",
+   "lat": 37.3684,
+   "lon": -122.1122,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Los Gatos Brewing Co",
+   "lat": 37.2263,
+   "lon": -121.9799,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Los Gatos High",
+   "lat": 37.232,
+   "lon": -121.9736,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Los Paseos",
+   "lat": 37.23,
+   "lon": -121.79,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Lowell HS",
+   "lat": 37.7278,
+   "lon": -122.483,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Lucasfilm HQ",
+   "lat": 37.7998,
+   "lon": -122.4571,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Lynbrook High",
+   "lat": 37.3068,
+   "lon": -122.0121,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "MV Transit Center",
+   "lat": 37.3944,
+   "lon": -122.0762,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "MacArthur BART",
+   "lat": 37.8285,
+   "lon": -122.2673,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Main St Cupertino",
+   "lat": 37.3245,
+   "lon": -122.0384,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Marin Academy",
+   "lat": 37.9762,
+   "lon": -122.5372,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Marin Catholic HS",
+   "lat": 37.956,
+   "lon": -122.5476,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Marin Country Day",
+   "lat": 37.9077,
+   "lon": -122.5138,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Marin Country Mart",
+   "lat": 37.9455,
+   "lon": -122.5089,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "McClellan Ranch",
+   "lat": 37.3113,
+   "lon": -122.0478,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "McKinley Square",
+   "lat": 37.7602,
+   "lon": -122.3989,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Menlo Park Caltrain",
+   "lat": 37.4548,
+   "lon": -122.1826,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Menlo School",
+   "lat": 37.457,
+   "lon": -122.193,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Menlo-Atherton High",
+   "lat": 37.4574,
+   "lon": -122.1854,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Metropolitan Golf Links",
+   "lat": 37.7259,
+   "lon": -122.1938,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Microsoft SV Campus",
+   "lat": 37.4031,
+   "lon": -122.058,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Millbrae Station",
+   "lat": 37.5998,
+   "lon": -122.3865,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Mills High School",
+   "lat": 37.5926,
+   "lon": -122.4033,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Milpitas BART",
+   "lat": 37.4103,
+   "lon": -121.8912,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Milpitas High",
+   "lat": 37.4392,
+   "lon": -121.8938,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Mission High School",
+   "lat": 37.7659,
+   "lon": -122.4285,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Mission Peak Trailhead",
+   "lat": 37.5241,
+   "lon": -121.913,
+   "kind": "nature",
+   "tier": 3
+  },
+  {
+   "name": "Mission SJ High",
+   "lat": 37.5271,
+   "lon": -121.9161,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Mission San Jose High",
+   "lat": 37.5238,
+   "lon": -121.9171,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Molloy's Tavern",
+   "lat": 37.6712,
+   "lon": -122.4571,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Monta Vista High",
+   "lat": 37.3184,
+   "lon": -122.0592,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Moonraker",
+   "lat": 37.6033,
+   "lon": -122.4923,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Moreau Catholic HS",
+   "lat": 37.6449,
+   "lon": -122.067,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Mount Eden High",
+   "lat": 37.6383,
+   "lon": -122.1005,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Mountain Home Inn",
+   "lat": 37.9127,
+   "lon": -122.5834,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Mountain Lake Park",
+   "lat": 37.7853,
+   "lon": -122.477,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Mountain View HS",
+   "lat": 37.3859,
+   "lon": -122.1041,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Museum of San Ramon Valley",
+   "lat": 37.8228,
+   "lon": -121.9998,
+   "kind": "museum",
+   "tier": 3
+  },
+  {
+   "name": "NewPark Mall",
+   "lat": 37.5245,
+   "lon": -122.0399,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "North Berkeley BART",
+   "lat": 37.8737,
+   "lon": -122.2833,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Northgate High",
+   "lat": 37.9411,
+   "lon": -121.9903,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Notre Dame HS Belmont",
+   "lat": 37.5227,
+   "lon": -122.2964,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Novato High School",
+   "lat": 38.1015,
+   "lon": -122.572,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Nvidia HQ",
+   "lat": 37.3705,
+   "lon": -121.9631,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "O'Connor Hospital",
+   "lat": 37.3271,
+   "lon": -121.938,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Oakland High",
+   "lat": 37.7996,
+   "lon": -122.2381,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Oakland Tech",
+   "lat": 37.8256,
+   "lon": -122.2634,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Ohlone Park",
+   "lat": 37.8735,
+   "lon": -122.2794,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Ohlone/Chynoweth",
+   "lat": 37.2803,
+   "lon": -121.8622,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Old Clam House",
+   "lat": 37.7418,
+   "lon": -122.4053,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Old Mandarin Islamic",
+   "lat": 37.7397,
+   "lon": -122.4919,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Old St Mary's Cathedral",
+   "lat": 37.7929,
+   "lon": -122.4054,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Old Town Los Gatos",
+   "lat": 37.2247,
+   "lon": -121.982,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Ole's Waffle Shop",
+   "lat": 37.7639,
+   "lon": -122.2438,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Oracle HQ",
+   "lat": 37.5307,
+   "lon": -122.2649,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Original Joe's",
+   "lat": 37.8003,
+   "lon": -122.4102,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Ortega Park",
+   "lat": 37.3502,
+   "lon": -122.0247,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Osher Marin JCC",
+   "lat": 38.0122,
+   "lon": -122.504,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Pacific Pinball Museum",
+   "lat": 37.7706,
+   "lon": -122.2757,
+   "kind": "museum",
+   "tier": 3
+  },
+  {
+   "name": "Palo Alto High",
+   "lat": 37.4258,
+   "lon": -122.1521,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "PayPal HQ",
+   "lat": 37.4109,
+   "lon": -121.952,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Pelican Inn",
+   "lat": 37.8619,
+   "lon": -122.5749,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Phillips 66 Rodeo Ref.",
+   "lat": 38.0446,
+   "lon": -122.2722,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Piedmont High",
+   "lat": 37.8235,
+   "lon": -122.2296,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Pleasant Hill BART",
+   "lat": 37.9285,
+   "lon": -122.0562,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Plumed Horse",
+   "lat": 37.2597,
+   "lon": -122.0333,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Port of Redwood City",
+   "lat": 37.503,
+   "lon": -122.2129,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Powell St Station",
+   "lat": 37.7846,
+   "lon": -122.4079,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Precita Park",
+   "lat": 37.7476,
+   "lon": -122.4113,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Preservation Park",
+   "lat": 37.8045,
+   "lon": -122.2749,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Ratto's Deli",
+   "lat": 37.8017,
+   "lon": -122.2735,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Redwood City Caltrain",
+   "lat": 37.4855,
+   "lon": -122.232,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Redwood High School",
+   "lat": 37.942,
+   "lon": -122.5333,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Rengstorff Park",
+   "lat": 37.4028,
+   "lon": -122.0996,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Richmond BART/Amtrak",
+   "lat": 37.937,
+   "lon": -122.3536,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Rincon Hill",
+   "lat": 37.7863,
+   "lon": -122.3931,
+   "kind": "neighborhood",
+   "tier": 3
+  },
+  {
+   "name": "Riordan HS",
+   "lat": 37.7238,
+   "lon": -122.4525,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Rockridge BART",
+   "lat": 37.8447,
+   "lon": -122.2517,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Roosevelt Middle",
+   "lat": 37.7789,
+   "lon": -122.4587,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Roxie Theater",
+   "lat": 37.7648,
+   "lon": -122.4225,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "SC Caltrain",
+   "lat": 37.3532,
+   "lon": -121.9366,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "SF Main Library",
+   "lat": 37.7793,
+   "lon": -122.4157,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "SRI International",
+   "lat": 37.4552,
+   "lon": -122.1798,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Sacred Heart Prep",
+   "lat": 37.46,
+   "lon": -122.2015,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Sam's Anchor Cafe",
+   "lat": 37.8731,
+   "lon": -122.4571,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Sam's Chowder House",
+   "lat": 37.514,
+   "lon": -122.4884,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "San Antonio Caltrain",
+   "lat": 37.4074,
+   "lon": -122.1077,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "San Antonio Center",
+   "lat": 37.4058,
+   "lon": -122.1084,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "San Bruno BART",
+   "lat": 37.6376,
+   "lon": -122.4159,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "San Carlos Caltrain",
+   "lat": 37.5074,
+   "lon": -122.2603,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "San Jose High School",
+   "lat": 37.3496,
+   "lon": -121.8828,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "San Leandro BART",
+   "lat": 37.7222,
+   "lon": -122.1613,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "San Leandro HS",
+   "lat": 37.7181,
+   "lon": -122.1471,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "San Leandro Marina",
+   "lat": 37.7013,
+   "lon": -122.1911,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "San Rafael High",
+   "lat": 37.9754,
+   "lon": -122.5203,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "San Rafael Transit Ctr",
+   "lat": 37.9711,
+   "lon": -122.5306,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "San Ramon Valley HS",
+   "lat": 37.8228,
+   "lon": -121.9906,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Santa Teresa Station",
+   "lat": 37.2299,
+   "lon": -121.8226,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Saratoga High",
+   "lat": 37.2779,
+   "lon": -122.0362,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Sardine Can Vallejo",
+   "lat": 38.1015,
+   "lon": -122.2648,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Sausalito Ferry",
+   "lat": 37.859,
+   "lon": -122.4788,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Scoma's Sausalito",
+   "lat": 37.8646,
+   "lon": -122.4842,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Sequoia High School",
+   "lat": 37.487,
+   "lon": -122.232,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Serra High School",
+   "lat": 37.541,
+   "lon": -122.323,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Serramonte Center",
+   "lat": 37.6693,
+   "lon": -122.4665,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Snell Station",
+   "lat": 37.2544,
+   "lon": -121.833,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Sobrante Ridge Preserve",
+   "lat": 37.9744,
+   "lon": -122.2739,
+   "kind": "nature",
+   "tier": 3
+  },
+  {
+   "name": "Sol Food",
+   "lat": 37.9741,
+   "lon": -122.5257,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Solano Fairgrounds",
+   "lat": 38.1425,
+   "lon": -122.2286,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "South Hayward BART",
+   "lat": 37.6346,
+   "lon": -122.0574,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "South Park",
+   "lat": 37.7815,
+   "lon": -122.3944,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "South SF Caltrain",
+   "lat": 37.6555,
+   "lon": -122.4054,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Spreckels Lake",
+   "lat": 37.7716,
+   "lon": -122.4907,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "St. Francis Fountain",
+   "lat": 37.7527,
+   "lon": -122.4102,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "St. Ignatius Prep",
+   "lat": 37.7218,
+   "lon": -122.4941,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "St. James Park",
+   "lat": 37.3395,
+   "lon": -121.8901,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Stoneridge Mall",
+   "lat": 37.6852,
+   "lon": -121.9218,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Stonestown Galleria",
+   "lat": 37.7285,
+   "lon": -122.4756,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Sun Valley Mall",
+   "lat": 37.9689,
+   "lon": -122.0574,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Sunnydale Station",
+   "lat": 37.7106,
+   "lon": -122.4098,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Sunnyvale Caltrain",
+   "lat": 37.3786,
+   "lon": -122.0316,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Sunnyvale Heritage Museum",
+   "lat": 37.3688,
+   "lon": -122.0242,
+   "kind": "museum",
+   "tier": 3
+  },
+  {
+   "name": "Sutro Heights Park",
+   "lat": 37.7793,
+   "lon": -122.5127,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Swan Oyster Depot",
+   "lat": 37.7913,
+   "lon": -122.4211,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Tadich Grill",
+   "lat": 37.794,
+   "lon": -122.4008,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Tam High School",
+   "lat": 37.8961,
+   "lon": -122.5423,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Tamien Station",
+   "lat": 37.3113,
+   "lon": -121.8845,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Tanforan (former)",
+   "lat": 37.6367,
+   "lon": -122.4222,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Tartine Bakery",
+   "lat": 37.7614,
+   "lon": -122.4241,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Tennyson High",
+   "lat": 37.6337,
+   "lon": -122.0808,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Terra Linda High",
+   "lat": 38.0135,
+   "lon": -122.5443,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Terra Nova High",
+   "lat": 37.6217,
+   "lon": -122.4802,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Tesla Factory",
+   "lat": 37.4934,
+   "lon": -121.945,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Tesla Palo Alto",
+   "lat": 37.3946,
+   "lon": -122.1502,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "The Trident",
+   "lat": 37.8607,
+   "lon": -122.4786,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Tiburon Ferry",
+   "lat": 37.873,
+   "lon": -122.456,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Union City BART",
+   "lat": 37.591,
+   "lon": -122.0173,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Val's Burgers",
+   "lat": 37.6768,
+   "lon": -122.0797,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Vallejo Ferry Terminal",
+   "lat": 38.1005,
+   "lon": -122.2665,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Vallejo Naval Museum",
+   "lat": 38.1037,
+   "lon": -122.2582,
+   "kind": "museum",
+   "tier": 3
+  },
+  {
+   "name": "Vintage Oaks",
+   "lat": 38.1053,
+   "lon": -122.5641,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Walnut Creek BART",
+   "lat": 37.9053,
+   "lon": -122.0672,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "War Memorial Opera House",
+   "lat": 37.7784,
+   "lon": -122.4208,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Warehouse Cafe P.C.",
+   "lat": 38.0454,
+   "lon": -122.1879,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Warm Springs BART",
+   "lat": 37.5024,
+   "lon": -121.9394,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Washington HS",
+   "lat": 37.7811,
+   "lon": -122.4922,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Washington High",
+   "lat": 37.5541,
+   "lon": -121.9847,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Washington Park",
+   "lat": 37.3769,
+   "lon": -122.0342,
+   "kind": "park",
+   "tier": 3
+  },
+  {
+   "name": "Westfield Oakridge",
+   "lat": 37.2554,
+   "lon": -121.8639,
+   "kind": "mall",
+   "tier": 3
+  },
+  {
+   "name": "Westmont High",
+   "lat": 37.2777,
+   "lon": -121.9856,
+   "kind": "school",
+   "tier": 3
+  },
+  {
+   "name": "Winchester VTA",
+   "lat": 37.2571,
+   "lon": -121.9502,
+   "kind": "transit",
+   "tier": 3
+  },
+  {
+   "name": "Women's Building",
+   "lat": 37.7601,
+   "lon": -122.4217,
+   "kind": "landmark",
+   "tier": 3
+  },
+  {
+   "name": "Xerox PARC",
+   "lat": 37.4028,
+   "lon": -122.1494,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "YouTube HQ",
+   "lat": 37.6285,
+   "lon": -122.4262,
+   "kind": "office",
+   "tier": 3
+  },
+  {
+   "name": "Zachary's Pizza",
+   "lat": 37.8459,
+   "lon": -122.2513,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Zeitgeist",
+   "lat": 37.7702,
+   "lon": -122.4223,
+   "kind": "restaurant",
+   "tier": 3
+  },
+  {
+   "name": "Zio Fraedo's Vallejo",
+   "lat": 38.0961,
+   "lon": -122.2478,
+   "kind": "restaurant",
+   "tier": 3
+  }
+ ]
 }
