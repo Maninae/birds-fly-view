@@ -155,6 +155,40 @@ export const RESCUE_VY = 2;
  * never below it. Yaw is preserved so the player still faces where they
  * were flying.
  */
+/**
+ * Rescue from UNDER the world: pop the pose above a surface known to sit
+ * overhead (spawn raced streaming terrain, or tiles materialized above the
+ * bird). Same neutral-pose shape as the stuck rescue, but the target height
+ * comes from the detected overhead surface, not from groundBelow (which sees
+ * nothing from inside the void).
+ */
+export function performUnderWorldRescue(
+  pose: BirdPose,
+  stuck: StuckMemory,
+  flight: FlightMemory,
+  col: CollisionMemory,
+  tuning: CraftTuning,
+  world: WorldSource,
+  surfaceY: number,
+): void {
+  const margin = Math.max(tuning.LAND_HEIGHT * 2, RESCUE_MIN_MARGIN_M);
+  pose.position.y = surfaceY + margin;
+
+  pose.roll = 0;
+  pose.pitch = RESCUE_PITCH_RAD;
+  pose.speed = tuning.CRUISE_SPEED * RESCUE_SPEED_FRAC;
+
+  flight.vy = RESCUE_VY;
+  flight.timeSinceBeat = 0;
+  flight.flareCharge = 0;
+  col.wallClearSteps = 0;
+  col.lastGroundY = null;
+  col.lastGroundKind = null;
+
+  resetStuck(stuck);
+  enforceGroundFloor(pose, col, world, 0.05);
+}
+
 export function performStuckRescue(
   pose: BirdPose,
   stuck: StuckMemory,

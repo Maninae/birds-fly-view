@@ -74,7 +74,7 @@ export class WorldSwitcher {
     origin: GeoPoint,
     probe: Vector3,
     maxProbeDist: number,
-  ): Promise<{ world: WorldSource; groundY: number } | null> {
+  ): Promise<{ world: WorldSource; groundY: number | null } | null> {
     const myGen = ++this.gen;
     this.ui.setError(null);
     this.ui.setLoading('finding your sky…');
@@ -132,11 +132,14 @@ export class WorldSwitcher {
         return null;
       }
 
-      // We won — commit.
+      // We won — commit. groundY is null when the world can't answer yet
+      // (photoreal tiles still streaming): the caller must fall back to a
+      // real elevation source, NOT zero — a sea-level spawn at a hilly
+      // origin buries the bird inside the terrain.
       this.world = local;
       this.lastOrigin = origin;
       const hit = local.groundBelow(probe, maxProbeDist);
-      const groundY = hit ? hit.point.y : 0;
+      const groundY = hit ? hit.point.y : null;
       this.hooks.onReady(local);
       return { world: local, groundY };
     } catch (err) {

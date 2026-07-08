@@ -25,6 +25,31 @@ const MAX_TILES = 40;             // LRU cap — ~40 × 256² floats ≈ 10 MB
  */
 export const TERRAIN_MESH_GRID = 64;
 
+/**
+ * One-shot elevation lookup for a single point (meters above sea level).
+ *
+ * Fetches exactly one z12 Terrarium tile and bilinear-samples it. Used by
+ * the takeoff path as the elevation-aware spawn fallback when the active
+ * world cannot answer a ground probe yet (photoreal tiles still streaming),
+ * which used to bury spawns inside high terrain. Returns null on any
+ * network/decode failure; callers must handle it.
+ */
+export async function fetchElevationAt(lat: number, lon: number): Promise<number | null> {
+  try {
+    const fx = lonToTileX(lon, TERRAIN_ZOOM);
+    const fy = latToTileY(lat, TERRAIN_ZOOM);
+    const tx = Math.floor(fx), ty = Math.floor(fy);
+    const res = await fetch(TERRARIUM_URL(TERRAIN_ZOOM, tx, ty));
+    if (!res.ok) return null;
+    const elev = await decodeTerrariumPng(await res.arrayBuffer());
+    const px = Math.min(TILE_SIZE - 1, Math.max(0, Math.round((fx - tx) * TILE_SIZE - 0.5)));
+    const py = Math.min(TILE_SIZE - 1, Math.max(0, Math.round((fy - ty) * TILE_SIZE - 0.5)));
+    return elev[py * TILE_SIZE + px];
+  } catch {
+    return null;
+  }
+}
+
 interface TerrainTile {
   z: number;
   x: number;

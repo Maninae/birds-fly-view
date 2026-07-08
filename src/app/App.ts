@@ -13,6 +13,7 @@ import {
 import { readStoredCraft } from '../bird/craftTuning';
 import { START_ALTITUDE_M } from '../config';
 import { EnuFrame } from '../geo/mercator';
+import { fetchElevationAt } from '../geo/terrain';
 import type {
   BirdSystemApi,
   CraftKind,
@@ -296,7 +297,17 @@ export class App {
       return;
     }
 
-    const spawn = new Vector3(0, result.groundY + START_ALTITUDE_M, 0);
+    // Elevation-aware spawn: when the world can't answer the ground probe
+    // yet (photoreal tiles still streaming at a rural origin), fall back to
+    // the keyless Terrarium elevation instead of sea level — a zero-ground
+    // spawn at a 200m-high origin buries the bird inside the mountain.
+    let groundY = result.groundY;
+    if (groundY === null) {
+      const elev = await fetchElevationAt(point.lat, point.lon);
+      groundY = elev ?? 0;
+    }
+
+    const spawn = new Vector3(0, groundY + START_ALTITUDE_M, 0);
     const headingRad = ((headingDeg ?? 0) * Math.PI) / 180;
     this.bird.placeAt(spawn, headingRad);
     this.pins.anchor(point);

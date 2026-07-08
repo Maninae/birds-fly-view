@@ -55,6 +55,7 @@ import {
   horizontalDisplacement,
   newStuckMemory,
   performStuckRescue,
+  performUnderWorldRescue,
   resetStuck,
   updateStuckDetector,
 } from './stuckDetector.js';
@@ -66,6 +67,10 @@ import {
 } from './tuning.js';
 import { newWalkMemory, stepWalk } from './walk.js';
 import type { WalkMemory } from './walk.js';
+
+/** Under-world watchdog cadence (s) and how far above the pose it probes. */
+const UNDER_WORLD_CHECK_S = 0.5;
+const UNDER_WORLD_PROBE_M = 700;
 
 export class BirdSystem implements BirdSystemApi {
   readonly object: Group;
@@ -98,6 +103,11 @@ export class BirdSystem implements BirdSystemApi {
   private easeTo = new Vector3();
   /** Latch: which mode to enter when the ease completes. */
   private easeTargetMode: AppMode = 'flying';
+
+  /** Under-world watchdog cadence; primed short after placeAt so a buried
+   *  spawn rescues within a beat instead of a full interval. */
+  private underWorldTimer = 0.15;
+  private readonly uwProbe = new Vector3();
 
   // --- Fixed-timestep simulation state ----------------------------------
   /** Accumulator for the fixed physics step; drained by `update()`. */
@@ -274,6 +284,9 @@ export class BirdSystem implements BirdSystemApi {
     this._mode = 'flying';
     this._landing = null;
     this.easeT = 0;
+    // Prime the under-world watchdog for a fast first check: a spawn that
+    // raced streaming terrain should rescue within a beat.
+    this.underWorldTimer = 0.15;
     // Stale ground memory from a previous region would make enforceGroundFloor
     // snap a teleported bird back up to the old floor.
     this.col.lastGroundY = null;
@@ -476,6 +489,33 @@ export class BirdSystem implements BirdSystemApi {
       // across that pop for one frame.
       copyPose(this.pose, this.prevPhysicsPose);
     }
+
+    this.checkUnderWorld(dt, world);
+  }
+
+  /**
+   * Under-world watchdog: a spawn that raced streaming terrain (or tiles
+   * materializing overhead mid-flight) leaves the bird beneath the surface,
+   * where wall probes and the floor clamp see nothing. Signature: a surface
+   * ABOVE the pose with NO ground below it. Bridges never qualify — under a
+   * deck there is always road or water beneath the bird.
+   */
+  private checkUnderWorld(dt: number, world: WorldSource): void {
+    this.underWorldTimer -= dt;
+    if (this.underWorldTimer > 0) return;
+    this.underWorldTimer = UNDER_WORLD_CHECK_S;
+
+    const p = this.pose.position;
+    this.uwProbe.set(p.x, p.y + UNDER_WORLD_PROBE_M, p.z);
+    const above = world.groundBelow(this.uwProbe, UNDER_WORLD_PROBE_M - 1);
+    if (!above || above.point.y <= p.y + 0.5) return;
+    if (world.groundBelow(p)) return;   // something real below: not underworld
+
+    performUnderWorldRescue(
+      this.pose, this.stuck, this.flight, this.col, this.tuning, world,
+      above.point.y,
+    );
+    copyPose(this.pose, this.prevPhysicsPose);
   }
 
   private tickWalking(dt: number, input: InputState, world: WorldSource): void {
