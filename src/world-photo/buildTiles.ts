@@ -25,8 +25,19 @@ import {
 
 const DEG2RAD = MathUtils.DEG2RAD;
 
-/** LRU byte budget — Google tiles are heavy, but 600 MB is comfortable on a laptop GPU. */
-const LRU_MAX_BYTES = 600 * 1024 * 1024;
+/**
+ * LRU byte budget. 800 MB keeps the finer LODs (generous detail tiers, see
+ * PhotoWorld.ts) resident instead of thrashing; still comfortable on a
+ * laptop GPU. Library default is 400 MB.
+ */
+const LRU_MAX_BYTES = 800 * 1024 * 1024;
+/**
+ * Concurrent tile downloads (library default 25). Google serves over HTTP/2,
+ * so a deeper in-flight window keeps the parse queue fed while descending
+ * into a fine-LOD area. Parse stays at its default (5): glTF parse runs on
+ * the main thread and more concurrency there hitches frames.
+ */
+const DOWNLOAD_MAX_JOBS = 40;
 /** Cross-fade window between LOD swaps (ms). Kept short to hide pop without smearing motion. */
 const FADE_DURATION_MS = 250;
 
@@ -79,5 +90,6 @@ export function buildPhotoTiles(o: BuildPhotoTilesOptions): TilesRenderer {
   }));
 
   tiles.lruCache.maxBytesSize = LRU_MAX_BYTES;
+  tiles.downloadQueue.maxJobs = DOWNLOAD_MAX_JOBS;
   return tiles;
 }

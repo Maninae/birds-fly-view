@@ -35,14 +35,19 @@ const INIT_TIMEOUT_MS = 8000;
  * pixels (LOWER = finer tiles; library default 16). Near the ground we force
  * the deepest LODs Google serves; at cruise altitude coarser tiles are
  * indistinguishable and much cheaper to stream and render.
+ *
+ * Tuned generous: fine tiles must already be streaming on approach, not once
+ * the player is on top of them. The 'low' tier engages from 220 m AGL so a
+ * cruise descent has streaming headroom before arrival, and every tier is
+ * finer than the library default.
  */
-const DETAIL_ERROR_TARGET = { low: 4, mid: 12, high: 20 } as const;
+const DETAIL_ERROR_TARGET = { low: 3, mid: 8, high: 14 } as const;
 type DetailTier = keyof typeof DETAIL_ERROR_TARGET;
 /** Hysteresis bands (meters AGL) so tier flips are rare, not per-frame. */
-const LOW_ENTER_AGL_M = 100;
-const LOW_EXIT_AGL_M = 140;
-const HIGH_ENTER_AGL_M = 380;
-const HIGH_EXIT_AGL_M = 320;
+const LOW_ENTER_AGL_M = 220;
+const LOW_EXIT_AGL_M = 280;
+const HIGH_ENTER_AGL_M = 700;
+const HIGH_EXIT_AGL_M = 600;
 
 export class PhotoWorld implements WorldSource {
   readonly root: Group;
