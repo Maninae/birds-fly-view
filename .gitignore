@@ -4,3 +4,7 @@ dist/
 *.local
 .env
 .env.*
+
+# Baked voxel GLBs (produced by tools/voxel-spike; kept out of the repo, only
+# code+docs commit). Copy into public/voxel-spike/ before serving locally.
+public/voxel-spike/*.glb

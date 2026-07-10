@@ -1,0 +1,7 @@
+laspy[lazrs]>=2.5
+numpy>=1.26
+pillow>=10.0
+requests>=2.31
+trimesh>=4.4
+scipy>=1.11
+pyproj>=3.6

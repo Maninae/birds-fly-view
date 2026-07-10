@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>birds-fly-view — voxel spike (Ferry Building)</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #F5E3C8; }
+      canvas { display: block; }
+      #controls-hint {
+        position: fixed; bottom: 12px; right: 12px;
+        color: #5a4a37; font: 13px/1.5 -apple-system, sans-serif;
+        background: rgba(255,240,215,0.85); padding: 8px 12px; border-radius: 6px;
+        pointer-events: none;
+      }
+      #status {
+        position: fixed; top: 12px; left: 12px;
+        color: #5a4a37; font: 13px/1.5 -apple-system, sans-serif;
+        background: rgba(255,240,215,0.85); padding: 6px 10px; border-radius: 6px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">loading…</div>
+    <div id="controls-hint">
+      click to lock mouse · WASD move · space up · shift down/boost
+    </div>
+    <script type="module" src="/src/dev/voxel-demo.ts"></script>
+  </body>
+</html>
