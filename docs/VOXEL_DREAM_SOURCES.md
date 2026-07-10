@@ -11,7 +11,7 @@ Google Photorealistic 3D Tiles CANNOT be a source for baked assets, in any form,
 | Role | Source | Vintage | License | Access |
 |---|---|---|---|---|
 | Geometry | USGS 3DEP LiDAR point clouds (per-region workunits below) | 2018-2023 | Public domain | Free public EPT bucket `s3://usgs-lidar-public`, PDAL `readers.ept` bbox query |
-| Color | NAIP 2024 60cm California orthoimagery | summer 2024 | Public domain (credit USDA) | California State Geoportal (gis.data.ca.gov, free); AWS `naip-*` buckets are requester-pays |
+| Color | NAIP orthoimagery via `USDA_CONUS_PRIME` ImageServer (public, ~60cm; the dedicated `NAIP/California_2024_60cm` service at gis.apfo.usda.gov is auth-walled — returns a login page with image/png content-type) | 2022-2024 | Public domain (credit USDA) | `gis.apfo.usda.gov/arcgis/rest/services/USDA_CONUS_PRIME` exportImage, one call per zone bbox; bulk alternative: California State Geoportal (gis.data.ca.gov, free) |
 | Footprint snapping | Microsoft Global ML Building Footprints (2023, with height estimates) | 2014-2023 imagery | CDLA-Permissive 2.0 (no share-alike) | GitHub release files |
 | Footprints inside SF | DataSF Building Footprints | derived from 2010 aerials (geometry stale, use as anchors only) | DataSF open terms | data.sfgov.org |
 
@@ -37,9 +37,19 @@ EPT root pattern: `https://s3-us-west-2.amazonaws.com/usgs-lidar-public/<WORKUNI
 
 ## Access mechanics
 
-- Point clouds: PDAL `readers.ept` against the workunit's `ept.json` with `bounds` in EPSG:3857, one sub-tile at a time; drop noise (class 7), keep ground(2)/veg(3-5)/building(6)/water(9)/bridge(17); persist local subsets as COPC before voxelization. Stage all downloads on `/Volumes/vega` (heavy-asset policy).
-- NAIP: pull the 2024 60cm state package from gis.data.ca.gov (free) rather than the requester-pays AWS buckets.
-- LiDAR classification codes drive the palette (semantic voxels); NAIP drives albedo, quantized toward the dream palette.
+- Point clouds: pure-Python EPT reader (walk ept-hierarchy JSON, fetch intersecting ept-data LAZ nodes, decode with `laspy[lazrs]`) works well; PDAL not required. `bounds` in EPSG:3857, one sub-tile at a time. Stage all downloads on `/Volumes/vega` when running outside the sandbox (the session sandbox blocks vega; spike used the session scratchpad).
+- CLASSIFICATION REALITY (verified on SF 2023): the workunit's classes are {1 unclassified, 2 ground, 7 noise, 9 water, 17 bridge, 18/20} — there is NO building (6) and NO vegetation (3/4/5). "7 classes" in InPort metadata means that set, not ASPRS defaults. Structure must be derived from height-above-ground + connected-component labeling (small isolated above-ground components = vegetation, large = building). Re-check every workunit's actual class set before assuming ASPRS.
+- NAIP drives albedo (top-down drape per column; walls inherit the column top slightly darkened), quantized to ~56 colors so greedy meshing still collapses walls, then dream-graded (gamma lift, warm shift, chroma boost, black floor). Exclude water palette entries from the warm grade: it turns dusk-blue water gray-olive.
+
+## Spike ground truth (Ferry Building 1km², baked 2026-07-10)
+
+Pipeline lives in `tools/voxel-spike/`; dev harness is `voxel-demo.html` + `src/dev/voxel-demo.ts` (GLB itself gitignored). Key numbers from the shipped v3 spike:
+
+- 98.2M raw points (2567 EPT nodes, 475MB LAZ cache); 42.7M occupied voxels at 0.5m after denoise (drop connected components under 20 voxels).
+- Triangle ladder at 0.5m: naive per-face 141M (unexportable) → 1D row-run greedy 11.1M → true 2D greedy (rect merge keyed on tag + quantized color, seam-free per-corner AO) 8.3M / 367MB GLB. 2D greedy meshing is mandatory, not an optimization.
+- 1.0m variant: 2.55M triangles / 112MB GLB / 67s cold pipeline. 0.5m cold pipeline: ~13min (k-means colorize dominates at 486s; mesh 245s).
+- Renders at 85fps headed (Lambert vertex-color), GLB parses in ~0.4s.
+- Open items for production: street-level spike-forest noise (ground-connected clutter survives the floating-clump filter; needs a thin-column/height-texture filter), water palette entries excluded from warm grade, veg tagging via connected components (palette needs its green channel back), chunk mesh output at ~128m tiles for streaming, and per-zone GLB is too big to ship raw (column-span RLE + runtime meshing remains the production plan).
 
 ## Design outline (v1 shape, not yet spec'd)
 
