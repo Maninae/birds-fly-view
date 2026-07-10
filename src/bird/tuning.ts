@@ -4,7 +4,8 @@
  *
  * Feel targets (from SPEC + task brief):
  *   - Cruise ~18 m/s, min air 8, max dive ~45. Never stalls — just mushes.
- *   - Coordinated turn: bank drives yaw rate. Auto-level when idle.
+ *   - Coordinated turn: bank drives yaw rate. Roll auto-levels when idle;
+ *     pitch holds where the player left it (attitude-hold).
  *   - Ground-avoidance: below 3 m the pitch bends up automatically (unless landing).
  *   - Walking: 2.5 m/s waddle, hop on Space, hold Space >= 0.3 s to take off.
  */
@@ -52,7 +53,6 @@ export const AUTOLEVEL_ROLL = Math.PI * 90 / 180;  // rad/s decay when idle
 
 export const MAX_PITCH = Math.PI * 55 / 180;
 export const PITCH_RATE = Math.PI * 55 / 180;   // rad/s toward target pitch (owner: was dizzy at 90)
-export const AUTOLEVEL_PITCH = Math.PI * 45 / 180;
 
 /** Yaw rate at max bank; scales with sin(bank) for coordinated turn. */
 export const YAW_AT_MAX_BANK = Math.PI * 42 / 180;   // ~42°/s (owner: 70 was dizzy)

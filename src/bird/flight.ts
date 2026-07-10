@@ -2,8 +2,10 @@
  * FlightController — updates BirdPose during 'flying' mode.
  *
  * Model (energy-lite, no stall — "just look" feel over sim accuracy):
- *   1. Steering: mouse-X or turn axis → target bank; bank → yaw rate.
- *      Mouse-Y or pitchAxis → target pitch. Idle inputs auto-level.
+ *   1. Steering: turn axis → target bank; bank → yaw rate. Idle turn
+ *      auto-levels the roll. pitchAxis → target pitch, and pitch HOLDS on
+ *      release (attitude-hold): a released dive stays a dive until the
+ *      player pulls back up.
  *   2. Speed: pitch tilts the airspeed asymptote (dive faster / climb slower);
  *      SPEED_RESTORE pulls speed toward CRUISE_SPEED. flap adds impulses.
  *   3. Vertical: horizontal = speed·cos(pitch) along heading; vertical =
@@ -23,7 +25,6 @@ import {
 } from './collision.js';
 import type { CraftTuning } from './craftTuning.js';
 import {
-  AUTOLEVEL_PITCH,
   AUTOLEVEL_ROLL,
   BANK_RATE,
   BRAKE_LOW_ALT_MULTIPLIER,
@@ -142,10 +143,12 @@ function advance(
   } else {
     pose.roll = approach(pose.roll, 0, AUTOLEVEL_ROLL * dt);
   }
+  // Pitch is attitude-hold: no auto-level on release. The flare window
+  // (flareCharge > 0) keeps easing pitch toward the input target after a
+  // ground-skim, so a full flare at nominal steering speed dissolves in ~1 s
+  // (a brief graze at a low steering-scale dial can leave some residual climb).
   if (hasPitchInput || mem.flareCharge > 0) {
     pose.pitch = approach(pose.pitch, pitchTarget, PITCH_RATE * steeringScale * dt);
-  } else {
-    pose.pitch = approach(pose.pitch, 0, AUTOLEVEL_PITCH * dt);
   }
   pose.pitch = clamp(pose.pitch, -MAX_PITCH, MAX_PITCH);
   pose.roll = clamp(pose.roll, -tuning.MAX_BANK, tuning.MAX_BANK);
