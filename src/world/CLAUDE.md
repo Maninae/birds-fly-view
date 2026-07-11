@@ -27,6 +27,12 @@ the canonical `WorldSource` implementation the App renders.
 - **buildingHeights.ts** — parse `render_height` / `render_min_height` /
   `hide_3d` from feature props (bounds/clamps live here).
 - **palette.ts** — every color, tree/car-jitter helpers, hash function.
+- **geodata/** — Phase-1 data-additive layer: manifest loader, JSON tile
+  cache, hero-terrain z16 cache, real-tree streaming layer. Silent
+  fallback everywhere. See its `CLAUDE.md`.
+- **ground-paint/** — Phase-1 painted-ground layer: sidewalks, paths,
+  plazas, courts, parking, sand, pier decks, and crosswalk decals baked
+  per z14 tile. Streams alongside the vector-tile ring. See its `CLAUDE.md`.
 
 ## Design rules
 

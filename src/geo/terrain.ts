@@ -62,6 +62,17 @@ interface TerrainTile {
   failed: boolean;
 }
 
+/**
+ * Optional finer-grained elevation delegate. When present, `sample`,
+ * `sampleMeshY`, and `hasElevationAt` prefer this source at any point it
+ * can answer, falling back to the coarse z12 cache otherwise. Wired by
+ * `world/geodata/HeroTerrainCache` when the Phase-1 assets are present.
+ */
+export interface FineElevationSource {
+  /** Elevation at (lat, lon) meters, OR null when no coverage / not loaded. */
+  sampleFine(lat: number, lon: number): number | null;
+}
+
 /** Decode a fetched terrarium PNG into a Float32Array of elevations. */
 export async function decodeTerrariumPng(bytes: ArrayBuffer): Promise<Float32Array> {
   const blob = new Blob([bytes], { type: 'image/png' });
@@ -91,7 +102,18 @@ export class TerrainSampler {
   private tiles = new Map<string, TerrainTile>();
   private clock = 0;
   private disposed = false;
+  private fineSource: FineElevationSource | null = null;
   readonly zoom = TERRAIN_ZOOM;
+
+  /**
+   * Register or clear a finer-grained elevation delegate. Pass `null` to
+   * detach. Every subsequent `sample` / `sampleMeshY` / `hasElevationAt`
+   * call consults this source first and only falls back to the z12 cache
+   * when it returns null. Cheap: one function call per query.
+   */
+  setFineSource(source: FineElevationSource | null): void {
+    this.fineSource = source;
+  }
 
   /** Ensure the tiles covering a lat/lon are loaded. */
   async ensureLoaded(lat: number, lon: number): Promise<void> {
@@ -127,6 +149,14 @@ export class TerrainSampler {
    * Returns 0 when the covering z12 tile is not loaded.
    */
   sampleMeshY(lat: number, lon: number): number {
+    // Fine source (z16 hero-terrain PNG) beats the coarse triangle interp
+    // wherever it has coverage. Its native pixel spacing is finer than any
+    // z12 mesh cell, so drape sits on the same surface the finer mesh
+    // renders. The polygonOffset on draped materials absorbs sub-metre
+    // mismatch against the mesh's linear triangle interpolation at
+    // heroGrid resolution.
+    const fine = this.fineSource?.sampleFine(lat, lon);
+    if (fine !== null && fine !== undefined) return fine;
     const zoom = this.zoom;
     const fxTile = lonToTileX(lon, zoom);
     const fyTile = latToTileY(lat, zoom);
@@ -164,6 +194,8 @@ export class TerrainSampler {
 
   /** Sample elevation (meters) at a geographic point, bilinear. Returns 0 on miss. */
   sample(lat: number, lon: number): number {
+    const fine = this.fineSource?.sampleFine(lat, lon);
+    if (fine !== null && fine !== undefined) return fine;
     const fx = lonToTileX(lon, this.zoom);
     const fy = latToTileY(lat, this.zoom);
     const tx = Math.floor(fx), ty = Math.floor(fy);
@@ -183,6 +215,8 @@ export class TerrainSampler {
    * at Y = 0 across hillsides whose terrain hasn't loaded yet.
    */
   hasElevationAt(lat: number, lon: number): boolean {
+    // Fine source counts as elevation when it can answer here.
+    if (this.fineSource?.sampleFine(lat, lon) != null) return true;
     const { x, y } = geoToTile(lat, lon, this.zoom);
     const tile = this.tiles.get(key(x, y));
     return !!(tile && tile.elev);

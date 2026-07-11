@@ -37,6 +37,16 @@ export interface TileMaterials {
 }
 
 /**
+ * Extension points the coordinator can wire into every tile build.
+ * Currently: an opt-out for the procedural tree scatter on tiles the
+ * geodata bake will replace with real trees.
+ */
+export interface TileBuilderExtras {
+  /** Return true to suppress procedural scatter for this z14 tile. */
+  skipProceduralTreesFor?: (tx: number, ty: number) => boolean;
+}
+
+/**
  * Result of building one tile: the render group (or null if the tile has no
  * drawable content) plus the analytic collision payload (or null if the tile
  * has no collidable content — same predicate as "no buildings AND no bridges").
@@ -67,6 +77,7 @@ export function buildTilePayload(
   terrain: TerrainSampler,
   mats: TileMaterials,
   edges: EdgeDedupe,
+  extras: TileBuilderExtras = {},
 ): TilePayload {
   const g = new Group();
   g.name = `tile-content ${tx}/${ty}`;
@@ -171,11 +182,17 @@ export function buildTilePayload(
   // Trees — sparse instances inside parks/wood polygons AND lining
   // residential/minor streets (Bay Area is a tree-lined city). Trees
   // hide at MID tier — the biggest triangle sink at distance.
-  const trees = buildTreeInstances({ park, landcover, transportation }, tx, ty, tz, frame, terrain);
-  if (trees) {
-    for (const t of trees) {
-      t.userData.lodHideAt = 1;
-      g.add(t);
+  //
+  // Extras opt-out: when geodata carries a real-trees bake for this
+  // z14 tile, the procedural scatter is suppressed so the two don't
+  // stack. TreesLayer stamps bake'd instances into a sibling scene root.
+  if (!extras.skipProceduralTreesFor?.(tx, ty)) {
+    const trees = buildTreeInstances({ park, landcover, transportation }, tx, ty, tz, frame, terrain);
+    if (trees) {
+      for (const t of trees) {
+        t.userData.lodHideAt = 1;
+        g.add(t);
+      }
     }
   }
 

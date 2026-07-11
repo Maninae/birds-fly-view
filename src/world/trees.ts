@@ -89,6 +89,23 @@ function treeMaterial(): MeshLambertMaterial {
 }
 
 /**
+ * Shared low-poly tree assets, exposed so `world/geodata/treesLayer.ts` can
+ * stamp real trees using the same geometry the procedural scatter draws.
+ * Lazy-initialized on first call, same as the procedural path.
+ */
+export function getSharedTreeAssets(): {
+  coniferGeom: BufferGeometry;
+  broadleafGeom: BufferGeometry;
+  material: MeshLambertMaterial;
+} {
+  return {
+    coniferGeom: coniferGeometry(),
+    broadleafGeom: broadleafGeometry(),
+    material: treeMaterial(),
+  };
+}
+
+/**
  * Build InstancedMesh(es) of trees in one tile. Two variants (conifer +
  * broadleaf) each get their own InstancedMesh so shared geometry stays
  * shared. Returns [] if nothing to place.

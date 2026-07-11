@@ -34,6 +34,8 @@ import { buildTilePayload } from './tileBuilder';
 import { buildTerrainMesh } from './terrainMesh';
 import { disposeWindowTexture, windowTexture } from './windowTexture';
 import { WorldCollision } from './collision';
+import { GeoData } from './geodata';
+import { PaintLayer } from './ground-paint';
 
 /** Half-side of the ocean plane (m). Larger than fog radius; sits at y=0. */
 const OCEAN_HALF = 40_000;
@@ -55,6 +57,12 @@ export class StylizedWorld implements WorldSource {
   private started = false;
   private disposed = false;
 
+  // Phase-1 data-additive layers. Populated in `init()`; both roots stay
+  // parented to `this.root` for their lifetime so the coordinator's scene
+  // graph is stable even while the layer streams tiles in and out.
+  private geodata: GeoData;
+  private paintLayer: PaintLayer | null = null;
+
   // Cached materials — one instance per surface type, shared across every
   // tile mesh AND (for terrain) every terrain tile.
   private buildingMat: MeshLambertMaterial;
@@ -64,6 +72,12 @@ export class StylizedWorld implements WorldSource {
   private terrainMat: MeshLambertMaterial;
   private oceanMat: MeshLambertMaterial;
   private bridgeMat: MeshLambertMaterial;
+  /**
+   * Shared material for the painted-ground layer. Sits above roads via
+   * a more-negative polygonOffset so paint (sidewalks, crosswalks) never
+   * z-fights with the road ribbon material.
+   */
+  private paintMat: MeshLambertMaterial;
 
   constructor() {
     this.root = new Group();
@@ -97,6 +111,12 @@ export class StylizedWorld implements WorldSource {
     this.bridgeMat = new MeshLambertMaterial({
       vertexColors: true, flatShading: true,
     });
+    this.paintMat = new MeshLambertMaterial({
+      vertexColors: true, flatShading: true,
+      // More negative than the road material so paint sits on top rather
+      // than co-planar with the road ribbon; still above bare terrain.
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
 
     // Ocean plane under everything — catches gaps beyond loaded tiles.
     const ocean = new Mesh(new PlaneGeometry(OCEAN_HALF * 2, OCEAN_HALF * 2), this.oceanMat);
@@ -109,6 +129,13 @@ export class StylizedWorld implements WorldSource {
     this.terrainRoot = new Group();
     this.terrainRoot.name = 'terrain-tiles';
     this.root.add(this.terrainRoot);
+
+    // GeoData starts empty; init() fetches the manifest and wires layers.
+    this.geodata = new GeoData({
+      terrain: this.terrain,
+      getFrame: () => this.frame,
+      vectorZoom: VECTOR_ZOOM,
+    });
 
     // Streamer owns the world-global wall-edge dedupe. It hands each
     // tile builder an EdgeDedupe that writes to BOTH the global set
@@ -127,7 +154,9 @@ export class StylizedWorld implements WorldSource {
           waterMat: this.waterMat,
           greenMat: this.greenMat,
           bridgeMat: this.bridgeMat,
-        }, edges),
+        }, edges, {
+          skipProceduralTreesFor: (tx, ty) => this.geodata.skipProceduralTreesFor(tx, ty),
+        }),
       (tx, ty, tz) => {
         const lat = 0.5 * (tileYToLat(ty, tz) + tileYToLat(ty + 1, tz));
         const lon = 0.5 * (tileXToLon(tx, tz) + tileXToLon(tx + 1, tz));
@@ -163,11 +192,30 @@ export class StylizedWorld implements WorldSource {
 
     // Fetch the vector-tile template + pre-load terrain around the takeoff
     // point BEFORE resolving so buildings can drape correctly on spawn.
+    // GeoData init is independent (one manifest.json fetch); parallel is fine.
     await Promise.all([
       this.streamer.primeTemplate(),
       this.terrain.requestRing(origin.lat, origin.lon, 2),
+      this.geodata.init(),
     ]);
     if (this.disposed) return;
+
+    // Wire the Phase-1 additive layers into the scene now that geodata
+    // knows what it has. Missing layers give null roots and never attach.
+    if (this.geodata.treesRoot) this.root.add(this.geodata.treesRoot);
+    if (this.geodata.index.anyPaint) {
+      this.paintLayer = new PaintLayer(
+        this.geodata.index,
+        this.geodata.paintTileCache,
+        () => this.frame,
+        this.terrain,
+        VECTOR_ZOOM,
+        { paintMat: this.paintMat },
+      );
+      this.root.add(this.paintLayer.root);
+    }
+    // Prime the ring around the takeoff so hero-terrain PNGs start loading.
+    this.geodata.update(origin.lat, origin.lon);
 
     // Build the terrain-tile meshes for the initial ring.
     this.rebuildTerrainRing(origin.lat, origin.lon);
@@ -191,6 +239,11 @@ export class StylizedWorld implements WorldSource {
 
     // Rebuild terrain meshes for any new terrain tile in view.
     this.rebuildTerrainRing(geo.lat, geo.lon);
+
+    // Phase-1 additive layers: stream real trees, hero terrain, paint
+    // around the camera. No-op when the corresponding layer isn't baked.
+    this.geodata.update(geo.lat, geo.lon);
+    this.paintLayer?.update(geo.lat, geo.lon);
 
     // Distance-based LOD: hide the fat, subpixel-at-distance layers on
     // faraway tiles. Trees + lane lines at MID, minor roads at FAR.
@@ -258,6 +311,8 @@ export class StylizedWorld implements WorldSource {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.paintLayer?.dispose();
+    this.geodata.dispose();
     this.streamer.dispose();
     this.terrain.dispose();
     for (const mesh of this.terrainTiles.values()) mesh.geometry.dispose();
@@ -275,6 +330,7 @@ export class StylizedWorld implements WorldSource {
     this.terrainMat.dispose();
     this.oceanMat.dispose();
     this.bridgeMat.dispose();
+    this.paintMat.dispose();
   }
 
   /** Test-only: check that `started` flipped once init resolved. */
@@ -291,7 +347,15 @@ export class StylizedWorld implements WorldSource {
         const tx = c.x + dx, ty = c.y + dy;
         const k = `${tx}/${ty}`;
         if (this.terrainTiles.has(k)) continue;
-        const mesh = buildTerrainMesh(tx, ty, TERRAIN_ZOOM, this.frame, this.terrain, this.terrainMat);
+        // Hero-covered z12 tiles get denser subdivision. The hero z16 tile
+        // is ~483 m across at Bay latitude, so heroGrid=128 puts a mesh
+        // vertex every ~74 m across the z12 tile (vs the default 148 m),
+        // catching the z16 elevation signal without a mesh-render blowup.
+        const heroGrid = this.geodata.index.hasHeroTerrainForZ12(tx, ty) ? 128 : undefined;
+        const mesh = buildTerrainMesh(
+          tx, ty, TERRAIN_ZOOM, this.frame, this.terrain, this.terrainMat,
+          { heroGrid },
+        );
         if (mesh) {
           this.terrainTiles.set(k, mesh);
           this.terrainRoot.add(mesh);

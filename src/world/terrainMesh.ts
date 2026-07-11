@@ -23,24 +23,53 @@ import { terrainColorAt } from './palette';
 const GRID = TERRAIN_MESH_GRID;
 
 /**
+ * How far below the tile mesh a skirt strip drops around the border.
+ * Hides T-junctions at seams between tiles built at different subdivisions
+ * (hero tile at heroGrid vs ambient neighbor at GRID). Invisible under
+ * flat sections, absorbed by buildings/roads on top elsewhere.
+ */
+const SKIRT_DROP_M = 18;
+
+export interface BuildTerrainMeshOptions {
+  /**
+   * Override the mesh subdivision for this tile only. When present, the tile
+   * mesh is built at `heroGrid + 1` samples per side instead of the shared
+   * `GRID + 1`, and a skirt strip is emitted along all four edges so a
+   * denser hero tile joins a coarser ambient neighbor without a visible
+   * T-junction gap.
+   *
+   * Leave undefined for ambient (dream-world) tiles; the streamer picks
+   * the value up from the manifest on hero-covered z12 tiles.
+   */
+  heroGrid?: number;
+}
+
+/**
  * Build a terrain-tile mesh spanning the z12 tile at (`tx`, `ty`).
  * Assumes elevations at the sample points are already loaded in `terrain`.
  * Silent no-op mesh (returns null) if none are loaded.
  *
- * `material` is coordinator-owned so all terrain tiles share ONE material —
- * a per-tile allocation used to leak on eviction (only geometry was disposed).
+ * `material` is coordinator-owned so all terrain tiles share ONE material.
+ * `opts.heroGrid` bumps subdivision on this tile only; used for hero-
+ * terrain-covered SF tiles.
  */
 export function buildTerrainMesh(
   tx: number, ty: number, tz: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
   material: Material,
+  opts: BuildTerrainMeshOptions = {},
 ): Mesh | null {
-  const verts = (GRID + 1) * (GRID + 1);
+  const grid = opts.heroGrid ?? GRID;
+  const skirt = opts.heroGrid !== undefined;
+  const gridVertsPerSide = grid + 1;
+  const skirtVerts = skirt ? 4 * gridVertsPerSide : 0;
+  const verts = gridVertsPerSide * gridVertsPerSide + skirtVerts;
+  const skirtQuads = skirt ? 4 * grid : 0;
   const positions = new Float32Array(verts * 3);
   const normals = new Float32Array(verts * 3);
   const colors = new Float32Array(verts * 3);
-  const indices = new Uint32Array(GRID * GRID * 6);
+  const indices = new Uint32Array((grid * grid + skirtQuads) * 6);
 
   const west = tileXToLon(tx, tz);
   const east = tileXToLon(tx + 1, tz);
@@ -51,16 +80,16 @@ export function buildTerrainMesh(
   const enuOut = { x: 0, z: 0 };
 
   let hits = 0;
-  for (let iy = 0; iy <= GRID; iy++) {
-    const t = iy / GRID;
+  for (let iy = 0; iy <= grid; iy++) {
+    const t = iy / grid;
     const lat = north + (south - north) * t;
-    for (let ix = 0; ix <= GRID; ix++) {
-      const u = ix / GRID;
+    for (let ix = 0; ix <= grid; ix++) {
+      const u = ix / grid;
       const lon = west + (east - west) * u;
       const h = terrain.sample(lat, lon);
       if (h !== 0) hits++;
       frame.geoToEnu(lat, lon, enuOut);
-      const i = (iy * (GRID + 1) + ix) * 3;
+      const i = (iy * gridVertsPerSide + ix) * 3;
       positions[i] = enuOut.x;
       positions[i + 1] = h;
       positions[i + 2] = enuOut.z;
@@ -74,19 +103,26 @@ export function buildTerrainMesh(
 
   // Indices: two triangles per grid cell.
   let idx = 0;
-  for (let iy = 0; iy < GRID; iy++) {
-    for (let ix = 0; ix < GRID; ix++) {
-      const a = iy * (GRID + 1) + ix;
+  for (let iy = 0; iy < grid; iy++) {
+    for (let ix = 0; ix < grid; ix++) {
+      const a = iy * gridVertsPerSide + ix;
       const b = a + 1;
-      const c = a + (GRID + 1);
+      const c = a + gridVertsPerSide;
       const d = c + 1;
       indices[idx++] = a; indices[idx++] = c; indices[idx++] = b;
       indices[idx++] = b; indices[idx++] = c; indices[idx++] = d;
     }
   }
 
+  // Optional skirts: for hero tiles, drop a strip below each of the four
+  // borders so a coarser neighbor's straight edge cannot show a gap into
+  // the sky through T-junctions on curved terrain.
+  if (skirt) {
+    idx = emitSkirt(positions, normals, colors, indices, idx, gridVertsPerSide, grid);
+  }
+
   // Per-vertex normals via a single pass over the grid neighbors.
-  computeGridNormals(positions, normals, GRID + 1);
+  computeGridNormals(positions, normals, gridVertsPerSide);
 
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(positions, 3));
@@ -99,6 +135,66 @@ export function buildTerrainMesh(
   mesh.name = `terrain z${tz} ${tx}/${ty}`;
   mesh.frustumCulled = true;
   return mesh;
+}
+
+/**
+ * Emit four skirt strips (N, S, W, E borders) hanging below each edge
+ * vertex by `SKIRT_DROP_M`. The skirt vertices reuse a slightly darkened
+ * terrain color at the border's own elevation so they read as ground
+ * shadow through any T-junction gap. Returns the new triangle-index cursor.
+ */
+function emitSkirt(
+  positions: Float32Array,
+  normals: Float32Array,
+  colors: Float32Array,
+  indices: Uint32Array,
+  idx: number,
+  gridVertsPerSide: number,
+  grid: number,
+): number {
+  const topStart = gridVertsPerSide * gridVertsPerSide;
+  // Emit skirt strip for each edge. Each strip has (grid+1) skirt vertices
+  // dropped straight below the corresponding border vertex.
+  // Edge order: N (iy=0), S (iy=grid), W (ix=0), E (ix=grid).
+  const emitEdge = (
+    stripIndex: number,
+    baseIndexFor: (i: number) => number,
+  ) => {
+    const skirtBase = topStart + stripIndex * gridVertsPerSide;
+    for (let i = 0; i <= grid; i++) {
+      const topIdx = baseIndexFor(i);
+      const src = topIdx * 3;
+      const dst = (skirtBase + i) * 3;
+      positions[dst] = positions[src];
+      positions[dst + 1] = positions[src + 1] - SKIRT_DROP_M;
+      positions[dst + 2] = positions[src + 2];
+      normals[dst] = 0; normals[dst + 1] = 0; normals[dst + 2] = 0;
+      // Darken the skirt strip so any T-junction gap reads as a ground
+      // shadow rather than glowing sky. Multiply by 0.75, no hue shift.
+      colors[dst] = colors[src] * 0.75;
+      colors[dst + 1] = colors[src + 1] * 0.75;
+      colors[dst + 2] = colors[src + 2] * 0.75;
+    }
+    for (let i = 0; i < grid; i++) {
+      const t0 = baseIndexFor(i);
+      const t1 = baseIndexFor(i + 1);
+      const s0 = skirtBase + i;
+      const s1 = skirtBase + i + 1;
+      // Winding matched to each edge so faces point outward.
+      if (stripIndex === 0 || stripIndex === 3) {
+        indices[idx++] = t0; indices[idx++] = s0; indices[idx++] = s1;
+        indices[idx++] = t0; indices[idx++] = s1; indices[idx++] = t1;
+      } else {
+        indices[idx++] = t0; indices[idx++] = s1; indices[idx++] = s0;
+        indices[idx++] = t0; indices[idx++] = t1; indices[idx++] = s1;
+      }
+    }
+  };
+  emitEdge(0, (i) => i);
+  emitEdge(1, (i) => grid * gridVertsPerSide + i);
+  emitEdge(2, (i) => i * gridVertsPerSide);
+  emitEdge(3, (i) => i * gridVertsPerSide + grid);
+  return idx;
 }
 
 /** Central-difference normals over a regular grid — much cheaper than three's default. */
