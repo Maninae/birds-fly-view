@@ -58,6 +58,23 @@ Pipeline lives in `tools/voxel-spike/`; dev harness is `voxel-demo.html` + `src/
 - Runtime: new `VoxelWorld` implementing the locked `WorldSource` contract; greedy meshing in a worker; the analytic collision engine's occupancy grids consume voxels natively (collision becomes exact).
 - Attribution additions when shipped: USGS 3DEP, USDA NAIP, Microsoft Building Footprints (CDLA-P 2.0).
 
+## Ground-plane paint sources (researched 2026-07-10)
+
+For painting sidewalks, crosswalks, plazas, courts, and street detail in dream mode. Direction pivot: the voxel look was rejected by the owner (street-level spike noise); the LiDAR/NAIP data now feeds ADDITIVE upgrades to the existing stylized dream mode (trees, terrain, roofs, painted ground) instead of replacing it.
+
+| Source | Gives | License verdict | Role |
+|---|---|---|---|
+| LiDAR ground-return intensity (derived by us from the same 3DEP EPT) | ~20cm reflectance raster in SF; road paint is retroreflective so crosswalk stripes and lane markings glow; concrete vs asphalt separates | Public domain (our derivation; no agency publishes intensity rasters as products) | The granular "where exactly is the paint" layer, region-wide |
+| DataSF vector layers (Right-of-Way polygons h8n7-e4ns, Sidewalk Widths on centerlines ygcm-bt3x, Curb Ramps ch9w-7kih, blockface curb lines, MTA bike network, RPD Parks) | Authoritative SF street/sidewalk/curb geometry; sidewalks come as width-on-centerline (extrude both sides), NOT polygons; no crosswalk layer exists | ODC-PDDL (public domain dedication), individually stamped per dataset | SF ground-truth geometry |
+| Overture Maps Transportation (GA 2024-12) | Uniform region-wide footway segments with sidewalk/crosswalk subclasses | CDLA-Permissive v2 (Overture-native) / ODbL (OSM-lineage), both repo-safe | Region-wide pedestrian geometry carrier, fills SF gaps |
+| Raw OSM (beyond the pruned z14 OpenFreeMap tiles we consume) | Plazas, pitches with surface tags, park paths, parking polygons; sidewalk/crossing coverage is dense downtown, patchy elsewhere, split across two tagging schemes | ODbL with attribution (already shown) | Semantic detail: what kind of surface to paint |
+| NOAA Digital Coast 2022 SF ortho | Citywide sub-meter 4-band, the only fresh open SF ortho | Public domain (17 USC 105) | SF color reference above NAIP quality |
+| Santa Clara County OrthoImageryMosaic2024 | South Bay ortho backdrop | "Public domain" per county Hub; get written confirmation before redistributing | South Bay color, pending email |
+
+Rejected or deferred: NO open sub-15cm citywide SF ortho exists (DataSF "Aerial Photos" is a viewer, not a download; SFGIS image server license unverified). Mapillary crosswalk/lane detections are CC-BY-SA share-alike: reference only, never baked. Alameda County aerials have a blank license field: skip until written OK. MTC/ABAG have no ortho program.
+
+Paint recipe: DataSF/Overture/OSM say WHAT (sidewalk, crossing, court, plaza), our LiDAR intensity raster says WHERE EXACTLY plus the painted markings, NAIP/NOAA say the color family, the dream palette stylizes. Render as vector ribbons and decals plus a terrain tint wash, not photo textures.
+
 ## Primary sources
 
 - SF 2023: https://portal.opentopography.org/usgsDataset?dsid=CA_SanFrancisco_1_B23 and https://www.fisheries.noaa.gov/inport/item/73386
