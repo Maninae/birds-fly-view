@@ -122,28 +122,46 @@ describe('HeroTerrainCache: no fetch storm (integration-flight fix)', () => {
     hero.dispose();
   });
 
-  it('readyForZ12 waits until every LISTED child is resident', async () => {
+  it('persistently failing children retry, then resolve as coverage holes', async () => {
     // Manifest lists 3 of the 256 possible z16 children of z12 tile (10/20).
+    // A tile that 404s forever must NOT deadlock readyForZ12: after
+    // MAX_FETCH_ATTEMPTS rounds it counts as resolved-no-data so the gate
+    // opens with coarse fallback (the pre-fix code froze the z12 forever).
     const idx = new ManifestIndex({
       terrain: { zoom: 16, tiles: ['160/320', '161/320', '160/321'] },
     });
     let served = 0;
     globalThis.fetch = vi.fn(async () => {
       served++;
-      // Return a valid 1x1 Terrarium PNG (a signed marker) if any.
       return { ok: false, status: 404 } as unknown as Response;
     });
     const hero = new HeroTerrainCache(
       (z, x, y) => `t://${z}/${x}/${y}.png`, 16, idx,
     );
     expect(hero.readyForZ12(10, 20)).toBe(false);
+
+    // Round 1: all 3 fail; still not ready, tiles are eligible for retry.
     hero.prefetchZ12(10, 20);
-    // Give the fetches a tick to resolve (all fail, none flip loadedSet true).
     await new Promise((res) => setTimeout(res, 20));
-    // Still not ready: none loaded because fetch returns 404.
     expect(hero.readyForZ12(10, 20)).toBe(false);
-    // prefetchZ12 only enqueues the 3 listed tiles even though 256 possible.
     expect(served).toBe(3);
+
+    // Rounds 2..MAX_FETCH_ATTEMPTS: prefetch re-enqueues the failed tiles.
+    hero.prefetchZ12(10, 20);
+    await new Promise((res) => setTimeout(res, 20));
+    expect(hero.readyForZ12(10, 20)).toBe(false);
+    hero.prefetchZ12(10, 20);
+    await new Promise((res) => setTimeout(res, 20));
+
+    // Third failure per tile: resolved as holes; the gate opens.
+    expect(served).toBe(9);
+    expect(hero.readyForZ12(10, 20)).toBe(true);
+    // Sampling inside the hole still answers null (coarse fallback).
+    expect(hero.sampleFine(37.7955, -122.3937)).toBe(null);
+    // No further fetches once resolved.
+    hero.prefetchZ12(10, 20);
+    await new Promise((res) => setTimeout(res, 20));
+    expect(served).toBe(9);
     hero.dispose();
   });
 

@@ -25,6 +25,8 @@ const TILE_SIZE = 256;
 const MAX_TILES = 512;
 /** Concurrent HTTPS fetches for z16 Terrarium PNGs. */
 const MAX_IN_FLIGHT = 12;
+/** After this many failed fetches a tile resolves as a coverage hole. */
+const MAX_FETCH_ATTEMPTS = 3;
 /** Decimeter scale for the Int16 stored elevations. */
 const DM_PER_M = 10;
 
@@ -54,6 +56,7 @@ export class HeroTerrainCache implements FineElevationSource {
   private queued = new Set<string>();
   private queueOrder: string[] = [];
   private inFlight = 0;
+  private failCounts = new Map<string, number>();
 
   constructor(
     private readonly urlFor: (zoom: number, x: number, y: number) => string,
@@ -159,6 +162,7 @@ export class HeroTerrainCache implements FineElevationSource {
     this.loadedSet.clear();
     this.queued.clear();
     this.queueOrder.length = 0;
+    this.failCounts.clear();
   }
 
   // ── internals ────────────────────────────────────────────────────────────
@@ -200,8 +204,22 @@ export class HeroTerrainCache implements FineElevationSource {
         if (this.disposed) return;
         tile.elev = elev;
         this.loadedSet.add(k);
+        this.failCounts.delete(k);
       },
-      () => { /* silent; leave elev=null so sampleFine returns null */ },
+      () => {
+        if (this.disposed) return;
+        // Silent, but NEVER a permanent gate-block: a tile that keeps
+        // failing (404, decode error) must resolve as "no data" or
+        // readyForZ12 stays false forever and freezes every layer of
+        // its z12 (mesh, vector tiles, trees, paint) for the session.
+        const fails = (this.failCounts.get(k) ?? 0) + 1;
+        this.failCounts.set(k, fails);
+        if (fails >= MAX_FETCH_ATTEMPTS) {
+          this.loadedSet.add(k);   // resolved: coverage hole, coarse fallback
+        } else {
+          this.tiles.delete(k);    // next prefetchZ12 re-enqueues (retry)
+        }
+      },
     ).finally(() => {
       tile.loading = null;
       this.inFlight--;

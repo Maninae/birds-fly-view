@@ -37,8 +37,12 @@ export class ManifestIndex {
     if (!manifest) return;
     if (manifest.trees?.tiles) for (const k of manifest.trees.tiles) this.trees.add(k);
     if (manifest.terrain?.tiles) {
-      for (const k of manifest.terrain.tiles) this.terrain.add(k);
-      if (typeof manifest.terrain.zoom === 'number') this._terrainZoom = manifest.terrain.zoom;
+      // Coverage predicates (readyForZ12, prefetchZ12) assume z16 children
+      // of a z12 exactly (16x16 window); a manifest at any other zoom would
+      // make the sampler and the gate disagree. Treat non-16 as no coverage.
+      if (manifest.terrain.zoom === undefined || manifest.terrain.zoom === 16) {
+        for (const k of manifest.terrain.tiles) this.terrain.add(k);
+      }
     }
     if (manifest.paint?.tiles) for (const k of manifest.paint.tiles) this.paint.add(k);
   }
@@ -116,7 +120,7 @@ function warnOnce(msg: string): ManifestIndex {
   if (!warned) {
     warned = true;
     // Silent-fallback contract: exactly one warn, then never again.
-    console.warn(`[bfv geodata] no manifest — procedural fallback (${msg})`);
+    console.warn(`[bfv geodata] no manifest: procedural fallback (${msg})`);
   }
   return new ManifestIndex();
 }

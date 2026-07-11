@@ -29,7 +29,7 @@ const PAINT_DRAPE_RIBBON = 0.35;
 const PAINT_DRAPE_POLY = 0.25;
 const PAINT_DRAPE_CROSSWALK = 0.55;
 
-/** Max distance between two polyline vertices (m) — matches roads' subdivision. */
+/** Max distance between two polyline vertices (m): matches roads' subdivision. */
 const MAX_RIBBON_SEGMENT_M = 30;
 
 export interface PaintMaterials {

@@ -9,7 +9,7 @@ Phase-1 geographic scope: trees + terrain cover SF proper (the CA_SanFrancisco_1
 - `public/geo/manifest.json`: `{ "trees": { "tiles": ["14/x/y", ...] }, "terrain": { "zoom": 16, "tiles": ["16/x/y", ...] }, "paint": { "tiles": ["14/x/y", ...] } }`. Runtime fetches once at world init; missing manifest or missing layer key means that feature silently stays procedural/ambient (exactly current behavior).
 - Trees `public/geo/trees/14/{x}/{y}.json`: `{ "trees": [[lon_e7, lat_e7, height_dm, crown_dm], ...] }`. Integers; `_e7` = degrees × 1e7, `_dm` = decimeters. One file per z14 web-mercator tile (same grid the dream world already streams).
 - Terrain `public/geo/terrain/16/{x}/{y}.png`: standard 256px Terrarium encoding (`elevation = (R*256 + G + B/256) - 32768`), derived from USGS 3DEP 1m DEM (preferred; hydro-flattened) or EPT ground-class rasterization with hole fill.
-- Paint `public/geo/paint/14/{x}/{y}.json`: `{ "ribbons": [{"kind", "width_m", "path": [[lon_e7, lat_e7], ...]}], "polygons": [{"kind", "ring": [[lon_e7, lat_e7], ...]}], "decals": [{"kind": "crosswalk", "at": [lon_e7, lat_e7], "bearing_deg", "len_m", "width_m"}] }`.
+- Paint `public/geo/paint/14/{x}/{y}.json`: `{ "ribbons": [{"kind", "width_dm", "path": [[lon_e7, lat_e7], ...]}], "polygons": [{"kind", "ring": [[lon_e7, lat_e7], ...]}], "decals": [{"kind": "crosswalk", "at": [lon_e7, lat_e7], "bearing_cdeg", "len_dm", "width_dm"}] }`. All integers: `_dm` = decimeters, `_cdeg` = centi-degrees (matches the trees encoding; the as-shipped schema, aligned 2026-07-11 after a float-meters draft caused a silent NaN mismatch).
 - Paint kind enum (LOCKED): `sidewalk | path | crosswalk | court | plaza | parking | sand | pier_deck`. Color/palette mapping lives runtime-side only, so re-grading never requires a re-bake.
 - Size budget: total committed Phase-1 assets ≤ 30 MB. Log what got dropped to fit.
 
@@ -34,6 +34,12 @@ Phase-1 geographic scope: trees + terrain cover SF proper (the CA_SanFrancisco_1
 - Terrain: 3DEP 1m DEM GeoTIFFs via The National Map downloader; fall back to EPT class-2 rasterization if TNM fights the sandbox.
 - Paint: sidewalk ribbons from DataSF Sidewalk Widths (ygcm-bt3x, width-on-centerline, extrude both sides) clipped to Right-of-Way polygons (h8n7-e4ns); crosswalk decals from lidar ground-intensity rasters (retroreflective paint glows; confirm against OSM/Overture crossing nodes, orient by street bearing); courts/plazas/parking/paths from raw OSM + Overture Transportation; sand from NAIP-classified beach in the demo bboxes. Mapillary is reference-only (share-alike), never baked.
 
-## Verification bar (headed, never headless)
+## Tracked follow-ups (from the 2026-07-11 Phase-1 review; none fire on the shipped SF bake)
+
+- Hero drape precision: `sampleMeshY` returns raw z16 bilinear while the hero mesh renders 74m-spaced triangle interp, so draped ribbons can float/bury ~1m on steep hills (Twin Peaks class). Shipped paint zones are flat; fix is triangle-interp over the heroGrid vertices mirroring the coarse path.
+- StylizedWorld.ts is 398 lines (split rule is ~300): extract materials / rebuildTerrainRing / applyLod.
+- Mid-build LRU eviction race (hero children evicted between readyForZ12 and the build job) is unreachable at SF scale (200 tiles vs 512 cap); add a resident-set pin before scope expands beyond SF.
+- `isPaintTile` validator does not walk inner coords (width/bearing guards exist; path/ring coords unguarded).
+- Bake: tree crown radii ~26% understated (EPSG:3857 pixel treated as ground meter in tree_extract); fix scale then re-bake trees. Polygon rings emitted closed while types doc says open. `_way_bearing` is dead code. `Z_SCALE` unused.
 
 Fly both demo zones at close angles: trees match reality (GGP dense, Panhandle rows, street trees along the Embarcadero), no terrain cracks at hero/ambient borders, sidewalks/crosswalks read crisply from bird altitude and on foot (walk mode), 60 fps held, and everything still works with `public/geo/` absent (fallback test). Physics: landing and walking on hero terrain verified headed.

@@ -26,7 +26,10 @@ import { dmToM, e7ToDeg, type TreeInstance, type TreeTile } from './types';
 
 /** Real trees can be much denser than the procedural cap; DataSF street-tree */
 /** census is ~1.4M citywide. Cap defensively at 4000 instances per z14 tile. */
-const MAX_INSTANCES_PER_TILE = 4000;
+// Largest shipped SF tile is 5641 trees; a sequential cap below that drops a
+// spatially clustered tail (bake order is CHM scan-order), reading as a
+// lopsided half-empty tile. Average tile is ~2000, so 6000 stays cheap.
+const MAX_INSTANCES_PER_TILE = 6000;
 const RING_RADIUS = 2;
 
 /** Injection: the shared low-poly tree geometry, plus the shared material. */
@@ -136,11 +139,11 @@ export class TreesLayer {
   private disposeNode(k: string): void {
     const node = this.nodes.get(k);
     if (!node) return;
-    // Meshes carry sharedGeometry/sharedMaterial flags; only per-tile
-    // color attributes should be disposed. Assets are coordinator-owned.
+    // InstancedMesh.dispose() emits the 'dispose' event the renderer needs
+    // to free the per-tile instanceMatrix/instanceColor GPU buffers (~300KB
+    // per full tile). Shared geometry/material are NOT touched by it.
     for (const c of node.group.children) {
-      const im = c as unknown as { instanceColor?: { array?: unknown } };
-      if (im.instanceColor) im.instanceColor = null as unknown as never;
+      if ((c as InstancedMesh).isInstancedMesh) (c as InstancedMesh).dispose();
     }
     this.root.remove(node.group);
     this.nodes.delete(k);

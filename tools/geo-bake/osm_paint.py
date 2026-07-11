@@ -60,7 +60,7 @@ def query_paint(bbox: OsmBbox) -> dict:
     out body geom;
     """
     # Overpass returns 406 without a real User-Agent identifying the client.
-    headers = {'User-Agent': 'birds-fly-view geo-bake pipeline (contact: owenwang0328@gmail.com)'}
+    headers = {'User-Agent': 'birds-fly-view geo-bake pipeline (contact: https://github.com/Maninae/birds-fly-view)'}
     for attempt in (1, 2, 3):
         try:
             r = requests.post(OVERPASS_URL, data={'data': q},

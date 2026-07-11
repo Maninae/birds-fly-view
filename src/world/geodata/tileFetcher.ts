@@ -3,7 +3,7 @@
  * fallback rule as manifest: any failure resolves to null and the world
  * keeps its procedural behavior.
  *
- * This is not a full streamer — the ring tracking lives in the layer
+ * This is not a full streamer : the ring tracking lives in the layer
  * modules (paintLayer / treesLayer). This just answers "give me the
  * parsed JSON for tile (tx, ty), or null" with dedupe.
  */
@@ -49,7 +49,7 @@ export class JsonTileCache<T> {
     return promise;
   }
 
-  /** Synchronous cache peek — null if not resolved yet, if resolved null, or unknown. */
+  /** Synchronous cache peek : null if not resolved yet, if resolved null, or unknown. */
   peek(tx: number, ty: number): T | null {
     return this.entries.get(`${tx}/${ty}`)?.parsed ?? null;
   }
