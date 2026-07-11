@@ -1,50 +1,18 @@
-"""Fetch NAIP 2024 60cm RGB for the spike bbox from ArcGIS ImageServer.
+"""Re-export the NAIP fetcher from geolib.
 
-The California geoportal fronts the USDA APFO ArcGIS ImageServer; a single
-`exportImage` request returns the AOI reprojected on the fly. We ask for
-EPSG:3857 to sidestep any state-plane-vs-3857 mismatch. When this endpoint
-is unavailable, callers proceed with the per-tag palette (colorize will
-handle a None NAIP).
+Compat shim so run_spike.py keeps working after the promotion. The default
+endpoint constant is passed through so existing callers use the same URL.
 """
 from __future__ import annotations
 
-import logging
-from pathlib import Path
+import sys
+from pathlib import Path as _Path
 
-import requests
-
-from config import NAIP_CA_IMAGE_SERVER
-
-logger = logging.getLogger(__name__)
-
-REQUEST_TIMEOUT_S = 60
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from config import NAIP_CA_IMAGE_SERVER   # noqa: E402
+from geolib.naip import fetch_naip as _fetch_naip   # noqa: E402
 
 
-def fetch_naip(
-    bbox_3857: tuple[float, float, float, float],
-    px: int,
-    out_path: Path,
-) -> Path | None:
-    """Return the PNG path on success, None on any failure."""
-    x0, y0, x1, y1 = bbox_3857
-    params = {
-        'bbox': f'{x0},{y0},{x1},{y1}',
-        'bboxSR': '3857',
-        'imageSR': '3857',
-        'size': f'{px},{px}',
-        'format': 'png',
-        'f': 'image',
-    }
-    try:
-        r = requests.get(NAIP_CA_IMAGE_SERVER, params=params, timeout=REQUEST_TIMEOUT_S)
-        r.raise_for_status()
-        if r.headers.get('Content-Type', '').startswith('application/json'):
-            logger.warning('NAIP endpoint returned JSON (probably error): %s', r.text[:400])
-            return None
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_bytes(r.content)
-        logger.info('NAIP saved to %s (%.1f KB)', out_path, len(r.content) / 1024)
-        return out_path
-    except requests.RequestException as e:
-        logger.warning('NAIP fetch failed: %s', e)
-        return None
+def fetch_naip(bbox_3857, px, out_path):
+    """Voxel-spike backwards-compat: forward to geolib with the spike endpoint."""
+    return _fetch_naip(bbox_3857, px, out_path, endpoint=NAIP_CA_IMAGE_SERVER)

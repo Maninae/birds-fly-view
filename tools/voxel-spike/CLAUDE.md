@@ -9,10 +9,10 @@ zones, tile chunking, streaming) is a follow-up.
 
 ```
 config.py         constants, LAS class + voxel-tag enums, endpoint URLs, path layout
-mercator.py       EPSG:3857 helpers (bbox math with lat-scale correction)
-fetch_ept.py      EPT hierarchy walker + concurrent .laz downloader
-decode_points.py  LAZ decode + XY clip; noise class filter
-naip.py           ArcGIS ImageServer exportImage for NAIP RGB tile
+mercator.py       shim -> tools/geolib/mercator.py (promoted 2026-07-10)
+fetch_ept.py      shim -> tools/geolib/ept.py (promoted 2026-07-10)
+decode_points.py  shim -> tools/geolib/las.py (promoted 2026-07-10)
+naip.py           shim -> tools/geolib/naip.py (promoted 2026-07-10)
 voxelize.py       dense semantic grid; AGL-derived structure; column infill;
                   connected-components denoise; shoreline water safety
 colorize.py       NAIP top-down drape + wall darkening + 56-color k-means
@@ -22,6 +22,10 @@ mesh_export.py    2D greedy meshing (Minecraft-style) with per-corner AO baked
 run_spike.py      end-to-end driver, stage-cached intermediates
 requirements.txt  laspy[lazrs], numpy, pillow, requests, trimesh, scipy, pyproj
 ```
+
+Mercator, EPT walking, LAZ decode, and NAIP fetching now live in
+`tools/geolib/`; Phase 1's `tools/geo-bake/` pipeline shares those modules.
+The four shim files re-export the geolib names so `run_spike.py` keeps working.
 
 ## Run
 
