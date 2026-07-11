@@ -1,10 +1,14 @@
 /**
- * Phase-1 asset shapes served from public/geo/. LOCKED with the coordinator;
- * bake-builder and runtime-builder both code against these.
+ * Phase-1 asset shapes served from public/geo/. Aligned with the bake
+ * pipeline's compact-integer encoding so JSON stays small over the wire.
  *
- * All coordinates are integers to keep JSON small:
- *   _e7 = degrees x 1e7   (roughly 1 cm resolution)
- *   _dm = decimeters
+ * Scaling suffixes:
+ *   _e7   = degrees x 1e7       (roughly 1 cm angular resolution)
+ *   _dm   = decimeters          (0.1 m)
+ *   _cdeg = centi-degrees       (0.01 deg), used for bearings
+ *
+ * Runtime call site converts to meters/degrees via `dmToM`, `cdegToDeg`,
+ * `e7ToDeg` right at the read.
  */
 
 /** Enumerated paint surface kinds (see docs/DATA_DREAM_PHASE1.md). */
@@ -51,7 +55,8 @@ export interface TreeTile {
 /** Ribbon: painted linear feature (sidewalks, paths, pier decks). */
 export interface PaintRibbon {
   kind: PaintKind;
-  width_m: number;
+  /** Ribbon full-width in decimeters. */
+  width_dm: number;
   /** Polyline in lon/lat (_e7). */
   path: Array<[number, number]>;
 }
@@ -68,9 +73,12 @@ export interface PaintDecal {
   kind: 'crosswalk';
   /** Center in lon/lat (_e7). */
   at: [number, number];
-  bearing_deg: number;
-  len_m: number;
-  width_m: number;
+  /** ROAD bearing in centi-degrees (0 = north, CW+). */
+  bearing_cdeg: number;
+  /** Along-road length in decimeters. */
+  len_dm: number;
+  /** Across-road width in decimeters. */
+  width_dm: number;
 }
 
 /** JSON shape at public/geo/paint/14/{x}/{y}.json */
@@ -88,4 +96,9 @@ export function e7ToDeg(v: number): number {
 /** Convert integer _dm to meters. */
 export function dmToM(v: number): number {
   return v / 10;
+}
+
+/** Convert integer _cdeg to degrees. */
+export function cdegToDeg(v: number): number {
+  return v / 100;
 }

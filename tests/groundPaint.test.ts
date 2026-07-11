@@ -82,8 +82,8 @@ describe('buildPaintTile', () => {
       [Math.round(lon * 1e7), Math.round(lat * 1e7)];
     const tile: PaintTile = {
       ribbons: [
-        { kind: 'sidewalk', width_m: 3, path: [to(-122.394, 37.7956), to(-122.393, 37.7956)] },
-        { kind: 'path', width_m: 1.5, path: [to(-122.394, 37.7955), to(-122.393, 37.7955)] },
+        { kind: 'sidewalk', width_dm: 30, path: [to(-122.394, 37.7956), to(-122.393, 37.7956)] },
+        { kind: 'path', width_dm: 15, path: [to(-122.394, 37.7955), to(-122.393, 37.7955)] },
       ],
       polygons: [
         { kind: 'court', ring: [
@@ -93,7 +93,7 @@ describe('buildPaintTile', () => {
       ],
       decals: [
         { kind: 'crosswalk', at: to(-122.3937, 37.7955),
-          bearing_deg: 0, len_m: 10, width_m: 3 },
+          bearing_cdeg: 0, len_dm: 100, width_dm: 30 },
       ],
     };
     const group = buildPaintTile(tile, frame, terrain, mats);
@@ -122,5 +122,45 @@ describe('buildPaintTile', () => {
       frame, terrain, mats,
     );
     expect(group.children.length).toBe(0);
+  });
+
+  it('never emits NaN vertex positions from malformed inputs', () => {
+    // Regression for the integration-flight NaN cascade: a ribbon whose
+    // width is missing, a decal whose bearing/len/width is missing. Each
+    // row must be skipped, not silently NaN-propagated into vertex buffers.
+    const frame = new EnuFrame({ lat: 37.7955, lon: -122.3937 });
+    const terrain = new TerrainSampler();
+    terrain.setFineSource({
+      sampleFine: () => 3, readyForZ12: () => true, prefetchZ12: () => {},
+    });
+    const mats = { paintMat: new MeshLambertMaterial() };
+    const to = (lon: number, lat: number): [number, number] =>
+      [Math.round(lon * 1e7), Math.round(lat * 1e7)];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const badTile = {
+      ribbons: [
+        // Missing width_dm entirely.
+        { kind: 'sidewalk', path: [to(-122.394, 37.7955), to(-122.393, 37.7955)] } as unknown,
+        // width_dm = 0 (invalid).
+        { kind: 'path', width_dm: 0, path: [to(-122.394, 37.7956), to(-122.393, 37.7956)] },
+      ],
+      polygons: [],
+      decals: [
+        // Missing all dims.
+        { kind: 'crosswalk', at: to(-122.3937, 37.7955) } as unknown,
+      ],
+    } as unknown as PaintTile;
+    const group = buildPaintTile(badTile, frame, terrain, mats);
+    // Zero children: every malformed row was skipped.
+    expect(group.children.length).toBe(0);
+    // And critically: no NaN slipped into any (would-have-been) buffer.
+    group.traverse((n) => {
+      const geom = (n as unknown as { geometry?: { attributes?: { position?: { array: Float32Array } } } }).geometry;
+      if (!geom?.attributes?.position) return;
+      const arr = geom.attributes.position.array;
+      for (let i = 0; i < arr.length; i++) {
+        expect(Number.isFinite(arr[i])).toBe(true);
+      }
+    });
   });
 });

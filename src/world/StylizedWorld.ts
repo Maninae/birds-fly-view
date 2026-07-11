@@ -160,7 +160,12 @@ export class StylizedWorld implements WorldSource {
       (tx, ty, tz) => {
         const lat = 0.5 * (tileYToLat(ty, tz) + tileYToLat(ty + 1, tz));
         const lon = 0.5 * (tileXToLon(tx, tz) + tileXToLon(tx + 1, tz));
-        return this.terrain.hasElevationAt(lat, lon);
+        if (!this.terrain.hasElevationAt(lat, lon)) return false;
+        // A z14 tile inside a hero-covered z12 must wait until every listed
+        // z16 child is resident. Building drape samples fine elevations via
+        // `sampleMeshY`; a build that races the hero fetch would freeze a
+        // mix of fine/coarse into vertex buffers and floats over the mesh.
+        return this.geodata.isHeroReadyForZ14(tx, ty);
       },
     );
     this.root.add(this.streamer.root);
@@ -211,6 +216,7 @@ export class StylizedWorld implements WorldSource {
         this.terrain,
         VECTOR_ZOOM,
         { paintMat: this.paintMat },
+        (tx, ty) => this.geodata.isHeroReadyForZ14(tx, ty),
       );
       this.root.add(this.paintLayer.root);
     }
@@ -338,20 +344,36 @@ export class StylizedWorld implements WorldSource {
 
   // ── Internals ────────────────────────────────────────────────────────────
 
+  /**
+   * Maintain the ring of z12 terrain meshes around the camera. Ambient
+   * (non-hero-covered) tiles build immediately with GRID subdivision.
+   * Hero-covered tiles first prefetch every listed z16 child, then wait
+   * until `readyForZ12` flips true before building at heroGrid=128 — the
+   * only way `sample`/`sampleMeshY` produce fine values during vertex
+   * generation. A tile that hasn't been built yet gets retried each frame
+   * from the update loop.
+   */
   private rebuildTerrainRing(lat: number, lon: number): void {
     if (!this.frame || this.disposed) return;
     const c = geoToTile(lat, lon, TERRAIN_ZOOM);
     const R = 2;
+    const heroCache = this.geodata.heroTerrainCache;
     for (let dy = -R; dy <= R; dy++) {
       for (let dx = -R; dx <= R; dx++) {
         const tx = c.x + dx, ty = c.y + dy;
         const k = `${tx}/${ty}`;
         if (this.terrainTiles.has(k)) continue;
+        const isHero = this.geodata.index.hasHeroTerrainForZ12(tx, ty);
+        if (isHero && heroCache) {
+          // Ensure the z12's children are being fetched, then check ready.
+          heroCache.prefetchZ12(tx, ty);
+          if (!heroCache.readyForZ12(tx, ty)) continue;
+        }
         // Hero-covered z12 tiles get denser subdivision. The hero z16 tile
         // is ~483 m across at Bay latitude, so heroGrid=128 puts a mesh
         // vertex every ~74 m across the z12 tile (vs the default 148 m),
         // catching the z16 elevation signal without a mesh-render blowup.
-        const heroGrid = this.geodata.index.hasHeroTerrainForZ12(tx, ty) ? 128 : undefined;
+        const heroGrid = isHero ? 128 : undefined;
         const mesh = buildTerrainMesh(
           tx, ty, TERRAIN_ZOOM, this.frame, this.terrain, this.terrainMat,
           { heroGrid },

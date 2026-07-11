@@ -16,7 +16,7 @@ import { TerrainSampler } from '../../geo/terrain';
 import { appendPolygonFlat, subdividePolylineByMaxLen } from '../geometryUtils';
 import { RibbonBuilder } from '../roadRibbons';
 import type { PaintKind, PaintTile } from '../geodata/types';
-import { e7ToDeg } from '../geodata/types';
+import { cdegToDeg, dmToM, e7ToDeg } from '../geodata/types';
 import { paintColorFor } from './palette';
 import { appendCrosswalkDecal } from './crosswalkDecal';
 
@@ -60,7 +60,10 @@ export function buildPaintTile(
   const ribbons = tile.ribbons ?? [];
   for (const r of ribbons) {
     if (!r?.path || r.path.length < 2) continue;
-    const halfW = Math.max(0.6, r.width_m * 0.5);
+    // Bake encodes decimeters. Skip silently on missing/non-finite width so
+    // one bad entry can't NaN-cascade the whole ribbon.
+    if (!Number.isFinite(r.width_dm) || r.width_dm <= 0) continue;
+    const halfW = Math.max(0.6, dmToM(r.width_dm) * 0.5);
     // Project to ENU + subdivide so long segments drape on hilly terrain.
     const projected: { x: number; z: number }[] = [];
     for (const [lonE7, latE7] of r.path) {
@@ -115,11 +118,18 @@ export function buildPaintTile(
     const color = paintColorFor('crosswalk');
     for (const d of decals) {
       if (!d?.at) continue;
+      // Bake encodes cdeg + dm. Skip malformed rows silently rather than
+      // let a NaN dim explode the whole crosswalks mesh.
+      if (!Number.isFinite(d.bearing_cdeg)) continue;
+      if (!Number.isFinite(d.len_dm) || d.len_dm <= 0) continue;
+      if (!Number.isFinite(d.width_dm) || d.width_dm <= 0) continue;
       const enu = frame.geoToEnu(e7ToDeg(d.at[1]), e7ToDeg(d.at[0]));
       appendCrosswalkDecal(
         {
           centerX: enu.x, centerZ: enu.z,
-          bearingDeg: d.bearing_deg, lenM: d.len_m, widthM: d.width_m,
+          bearingDeg: cdegToDeg(d.bearing_cdeg),
+          lenM: dmToM(d.len_dm),
+          widthM: dmToM(d.width_dm),
         },
         color, positions, normals, colors, indices,
       );

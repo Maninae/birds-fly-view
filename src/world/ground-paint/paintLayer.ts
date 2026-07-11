@@ -38,6 +38,14 @@ export class PaintLayer {
     private readonly terrain: TerrainSampler,
     private readonly zoom: number,
     private readonly mats: PaintMaterials,
+    /**
+     * Gate: return true when the covering z12's hero terrain is fully
+     * resident. Paint drapes ribbon and polygon vertices via
+     * `terrain.sampleMeshY`; a build against a partial hero fetch would
+     * bake the wrong Y into vertex buffers and float sidewalks over the
+     * final mesh forever.
+     */
+    private readonly isHeroReadyForZ14: (tx: number, ty: number) => boolean,
   ) {
     this.root = new Group();
     this.root.name = 'ground-paint-layer';
@@ -50,6 +58,8 @@ export class PaintLayer {
       for (let dx = -RING_RADIUS; dx <= RING_RADIUS; dx++) {
         const tx = c.x + dx, ty = c.y + dy;
         if (!this.index.hasPaint(tx, ty)) continue;
+        // Same hero-ready gate as vector tiles and trees. Retries next frame.
+        if (!this.isHeroReadyForZ14(tx, ty)) continue;
         const k = `${tx}/${ty}`;
         if (!this.nodes.has(k)) this.startTile(tx, ty);
       }

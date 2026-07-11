@@ -14,7 +14,11 @@ import { buildTerrainMesh } from '../src/world/terrainMesh';
 
 /** Test double that returns pre-programmed elevations. */
 function makeSource(y: number | null): FineElevationSource {
-  return { sampleFine: () => y };
+  return {
+    sampleFine: () => y,
+    readyForZ12: () => true,
+    prefetchZ12: () => {},
+  };
 }
 
 describe('HeroTerrainCache: coverage predicates', () => {
@@ -91,6 +95,88 @@ describe('TerrainSampler: fine-source preference', () => {
     t.setFineSource(null);
     // No fine, no coarse tile loaded -> returns the fallback zero.
     expect(t.sample(0, 0)).toBe(0);
+  });
+});
+
+describe('HeroTerrainCache: no fetch storm (integration-flight fix)', () => {
+  it('sampleFine does NOT trigger a fetch on miss (auto-load removed)', () => {
+    const idx = new ManifestIndex({
+      terrain: { zoom: 16, tiles: ['10486/25327'] },
+    });
+    let fetches = 0;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      fetches++;
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+    const hero = new HeroTerrainCache(
+      (z, x, y) => `t://${z}/${x}/${y}.png`, 16, idx,
+    );
+    // Storm scenario: many sampleFine calls that would each auto-load.
+    for (let i = 0; i < 200; i++) {
+      hero.sampleFine(37.7955, -122.3937);
+    }
+    // The pre-fix code triggered a load per miss. Post-fix: zero fetches.
+    expect(fetches).toBe(0);
+    globalThis.fetch = realFetch;
+    hero.dispose();
+  });
+
+  it('readyForZ12 waits until every LISTED child is resident', async () => {
+    // Manifest lists 3 of the 256 possible z16 children of z12 tile (10/20).
+    const idx = new ManifestIndex({
+      terrain: { zoom: 16, tiles: ['160/320', '161/320', '160/321'] },
+    });
+    let served = 0;
+    globalThis.fetch = vi.fn(async () => {
+      served++;
+      // Return a valid 1x1 Terrarium PNG (a signed marker) if any.
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+    const hero = new HeroTerrainCache(
+      (z, x, y) => `t://${z}/${x}/${y}.png`, 16, idx,
+    );
+    expect(hero.readyForZ12(10, 20)).toBe(false);
+    hero.prefetchZ12(10, 20);
+    // Give the fetches a tick to resolve (all fail, none flip loadedSet true).
+    await new Promise((res) => setTimeout(res, 20));
+    // Still not ready: none loaded because fetch returns 404.
+    expect(hero.readyForZ12(10, 20)).toBe(false);
+    // prefetchZ12 only enqueues the 3 listed tiles even though 256 possible.
+    expect(served).toBe(3);
+    hero.dispose();
+  });
+
+  it('readyForZ12 returns true when the z12 has no coverage at all', () => {
+    const idx = new ManifestIndex({
+      terrain: { zoom: 16, tiles: ['999/999'] },
+    });
+    const hero = new HeroTerrainCache(
+      (z, x, y) => `t://${z}/${x}/${y}.png`, 16, idx,
+    );
+    // z12 (1, 1) covers z16 (16..31, 16..31): no overlap with 999/999.
+    expect(hero.readyForZ12(1, 1)).toBe(true);
+    hero.dispose();
+  });
+
+  it('prefetchZ12 is idempotent and does not double-queue', async () => {
+    const idx = new ManifestIndex({
+      terrain: { zoom: 16, tiles: ['160/320', '160/321'] },
+    });
+    let served = 0;
+    globalThis.fetch = vi.fn(async () => {
+      served++;
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+    const hero = new HeroTerrainCache(
+      (z, x, y) => `t://${z}/${x}/${y}.png`, 16, idx,
+    );
+    hero.prefetchZ12(10, 20);
+    hero.prefetchZ12(10, 20);
+    hero.prefetchZ12(10, 20);
+    await new Promise((res) => setTimeout(res, 20));
+    expect(served).toBe(2);
+    hero.dispose();
   });
 });
 

@@ -10,8 +10,9 @@
  *
  * Public surface: `GeoData` (constructed once by `StylizedWorld`).
  */
-import { EnuFrame } from '../../geo/mercator';
+import { EnuFrame, geoToTile } from '../../geo/mercator';
 import { TerrainSampler } from '../../geo/terrain';
+import { TERRAIN_ZOOM } from '../../config';
 import { HeroTerrainCache } from './heroTerrain';
 import { loadManifest, ManifestIndex, geoAssetBase } from './manifest';
 import { isPaintTile, isTreeTile, JsonTileCache } from './tileFetcher';
@@ -81,6 +82,7 @@ export class GeoData {
       this.trees = new TreesLayer(
         this.manifest, this.treeCache, assets,
         this.deps.getFrame, this.deps.terrain, this.deps.vectorZoom,
+        (tx, ty) => this.isHeroReadyForZ14(tx, ty),
       );
     }
 
@@ -93,16 +95,43 @@ export class GeoData {
   get heroTerrainCache(): HeroTerrainCache | null { return this.heroTerrain; }
   get paintTileCache(): JsonTileCache<PaintTile> { return this.paintCache; }
 
-  /** Update the streaming layers around the camera. Cheap; no-op until `init` resolves. */
+  /**
+   * Update the streaming layers around the camera. Cheap; no-op until
+   * `init` resolves. Trees + paint layers gate on hero-ready internally so
+   * their tile builds always see the final terrain surface. Hero-terrain
+   * prefetch is driven by StylizedWorld's terrain-tile ring, not here, so
+   * z16 fetches align 1:1 with the z12 tiles the world is about to build.
+   */
   update(cameraLat: number, cameraLon: number): void {
     if (!this.ready || this.disposed) return;
     this.trees?.update(cameraLat, cameraLon);
-    this.heroTerrain?.requestRing(cameraLat, cameraLon);
   }
 
   /** Convenience predicate for the tile builder: skip procedural tree scatter here. */
   skipProceduralTreesFor(tx: number, ty: number): boolean {
     return this.manifest.hasTrees(tx, ty);
+  }
+
+  /**
+   * True iff drape samples and mesh builds under the z14 tile at (`tx`, `ty`)
+   * can now safely rely on `sampleFine` returning fine elevations for the
+   * covering z12. This is the load-bearing gate that keeps vector tiles,
+   * trees, and paint from baking geometry against a partial hero fetch.
+   *
+   * Returns true when there's no hero coverage (nothing to wait for) OR
+   * the covering z12 tile's LISTED z16 children are fully resident.
+   */
+  isHeroReadyForZ14(tx14: number, ty14: number): boolean {
+    if (!this.heroTerrain) return true;
+    // z14 -> z12 ancestor: divide by 4.
+    return this.heroTerrain.readyForZ12(tx14 >> 2, ty14 >> 2);
+  }
+
+  /** True iff hero terrain for the covering z12 at (lat, lon) is fully resident. */
+  isHeroReadyAt(lat: number, lon: number): boolean {
+    if (!this.heroTerrain) return true;
+    const { x, y } = geoToTileZ12(lat, lon);
+    return this.heroTerrain.readyForZ12(x, y);
   }
 
   dispose(): void {
@@ -113,6 +142,11 @@ export class GeoData {
     this.paintCache.dispose();
     this.deps.terrain.setFineSource?.(null);
   }
+}
+
+/** z12 tile coords for a geographic point. */
+function geoToTileZ12(lat: number, lon: number): { x: number; y: number } {
+  return geoToTile(lat, lon, TERRAIN_ZOOM);
 }
 
 export { ManifestIndex } from './manifest';

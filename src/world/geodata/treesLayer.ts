@@ -56,6 +56,14 @@ export class TreesLayer {
     private readonly getFrame: () => EnuFrame | null,
     private readonly terrain: TerrainSampler,
     private readonly zoom: number,
+    /**
+     * Gate: return true when the covering z12's hero terrain is fully
+     * resident. Trees stamp at real elevations via `terrain.sampleMeshY`;
+     * a stamp built before hero-ready would freeze coarse elevations into
+     * instance transforms and leave real-tree instances floating above the
+     * final mesh forever.
+     */
+    private readonly isHeroReadyForZ14: (tx: number, ty: number) => boolean,
   ) {
     this.root = new Group();
     this.root.name = 'trees-layer';
@@ -79,6 +87,9 @@ export class TreesLayer {
       for (let dx = -RING_RADIUS; dx <= RING_RADIUS; dx++) {
         const tx = c.x + dx, ty = c.y + dy;
         if (!this.index.hasTrees(tx, ty)) continue;
+        // Gate: skip until the covering z12's hero terrain is resident.
+        // The next update() will retry each frame; cheap predicate.
+        if (!this.isHeroReadyForZ14(tx, ty)) continue;
         const k = `${tx}/${ty}`;
         wanted.add(k);
         if (!this.nodes.has(k)) this.startTile(tx, ty);

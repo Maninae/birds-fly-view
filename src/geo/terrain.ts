@@ -67,10 +67,21 @@ interface TerrainTile {
  * `sampleMeshY`, and `hasElevationAt` prefer this source at any point it
  * can answer, falling back to the coarse z12 cache otherwise. Wired by
  * `world/geodata/HeroTerrainCache` when the Phase-1 assets are present.
+ *
+ * The extra prefetch / readiness methods let the coordinator pre-warm the
+ * cache when a z12 enters the terrain ring AND gate mesh + drape sample
+ * consumers until every listed child tile for the covering z12 is resident.
+ * That gate is what prevents the pre-fix "hero mesh baked from partial
+ * data" hole; without it, a mesh built while children were streaming would
+ * freeze coarse elevations forever.
  */
 export interface FineElevationSource {
   /** Elevation at (lat, lon) meters, OR null when no coverage / not loaded. */
   sampleFine(lat: number, lon: number): number | null;
+  /** True iff every LISTED child of the covering z12 is fully resident. */
+  readyForZ12(tx12: number, ty12: number): boolean;
+  /** Bulk prefetch every listed child of a z12 tile. Idempotent, non-blocking. */
+  prefetchZ12(tx12: number, ty12: number): void;
 }
 
 /** Decode a fetched terrarium PNG into a Float32Array of elevations. */
