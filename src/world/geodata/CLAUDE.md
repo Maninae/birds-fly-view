@@ -27,6 +27,15 @@ a layer is absent, or a specific tile fetch fails.
   geometries from `../trees.ts`. Where a tile is covered, the vector-tile
   builder's procedural scatter is suppressed (see `skipProceduralTreesFor`
   in `tileBuilder.ts`).
+- **roofLookup.ts** — Phase 2. Per-tile centroid-bucket lookup keyed by
+  `RoofLookup.nearest(worldX, worldZ)`. Consumed by `buildingMesh` via the
+  tile-builder extras when the manifest lists a roofs bake for the tile.
+  Silent fallback: missing bake or pending JSON = flat-prism extrusion
+  (byte-identical Phase 1).
+- **washLayer.ts** — Phase 2. `WashCache` streams 64x64 NAIP-derived PNGs
+  per z14 tile. `sample(lat, lon)` returns a [0.6, 1.4] per-channel
+  multiplier the green-mesh builder applies to its polygon tint. Missing
+  coverage / pending fetch = null = untouched palette.
 - **index.ts** — `GeoData` facade owned by `StylizedWorld`. Constructed
   eagerly, `init()` fetches the manifest and wires layers. `update(lat,
   lon)` streams the ring.

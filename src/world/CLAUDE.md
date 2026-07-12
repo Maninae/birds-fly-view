@@ -14,7 +14,11 @@ the canonical `WorldSource` implementation the App renders.
   merged meshes (buildings, roads, water, greens, trees).
 - **terrainMesh.ts** — heightfield mesh per Terrarium z12 tile.
 - **buildingMesh.ts** — extrude footprints into flat-shaded roofs + walls
-  with per-vertex fake AO and hue-jittered warm colors.
+  with per-vertex fake AO and hue-jittered warm colors. Optional Phase-2
+  `RoofLookup` override picks a LiDAR eave height and delegates roof
+  triangulation to `pitchedRoof.ts`.
+- **pitchedRoof.ts** — Phase 2. Stylized gable and pyramid-hip emitters
+  invoked from `buildingMesh` when a footprint matches a bake record.
 - **surfaceMesh.ts** — roads (ribbons), water (flat polygons), greens
   (parks/wood/grass polygons). All draped on terrain, offset slightly.
 - **roadRibbons.ts** — turn a polyline + half-width into ribbon triangles.
