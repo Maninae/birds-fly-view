@@ -3,11 +3,16 @@
  * and starts the render loop. All logic lives in App/UI.
  */
 import { App, defaultFactories } from './app/App';
+import { consumeMagicKey } from './magicKey';
 import { createUi } from './ui/createUi';
 
 function boot(): void {
   const canvas = document.getElementById('bfv-canvas') as HTMLCanvasElement | null;
   if (!canvas) throw new Error('missing #bfv-canvas');
+
+  // #key= magic link must be consumed before App builds: the world switcher
+  // reads the stored key at construction to default to photoreal.
+  const magicKeyStored = consumeMagicKey();
 
   // A holder for App refs so hooks can reach it before construction returns.
   const holder: { app: App | null } = { app: null };
@@ -28,6 +33,10 @@ function boot(): void {
   const app = new App({ canvas, ui, factories: defaultFactories() });
   holder.app = app;
   app.start();
+
+  if (magicKeyStored) {
+    ui.setError('photoreal unlocked: pick a spot and fly');
+  }
 }
 
 if (document.readyState === 'loading') {

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 
 // GitHub Pages serves this repo at /birds-fly-view/
@@ -13,5 +14,10 @@ export default defineConfig({
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 1500,
+  },
+  test: {
+    // Agent worktrees check out under .claude/worktrees/; without this
+    // exclusion vitest sweeps their duplicate test trees into the run.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**'],
   },
 });
