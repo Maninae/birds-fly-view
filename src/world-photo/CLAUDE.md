@@ -10,6 +10,14 @@ user-supplied API key. Implements the `WorldSource` contract from
 ```
 PhotoWorld.ts      Class + WorldSource surface. Owns the wrapper root Group,
                    the TilesRenderer instance, and the down-cast Raycaster.
+                   park()/resume(): in-session warm cache (WorldSwitcher parks
+                   instead of disposing on world switch; resume re-attaches
+                   the live tileset). SESSION-ONLY per Google ToS: tiles are
+                   never persisted to disk or storage. resume() refuses a
+                   different origin (re-anchor via ReorientationPlugin was
+                   tried and does not converge; switcher builds fresh).
+debugHook.ts       window.__bfvBvh debug/benchmark hook (split from
+                   PhotoWorld).
 buildTiles.ts      Constructs the TilesRenderer and registers all plugins.
                    Owns the DRACOLoader singleton (points at /draco/, no CDN).
 ready.ts           Init-time RAF driver: pumps tiles.update() until root +

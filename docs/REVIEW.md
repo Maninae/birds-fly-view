@@ -113,3 +113,11 @@ headed). Final state verified on the live site: audit gates 99.5%/99.9%/100%/
 - Deferred LOW review items: PhotoWorld dispose-during-load toast, palette hash
   over-mixing, build-budget micro-yielding, HUD listener dispose path. All
   cosmetic/perf-margin.
+- **Photoreal cold-load ordering**: a near-first tile priority (linear and
+  banded variants) was tried 2026-07-12; under clean controlled A/B it showed
+  no visible benefit over the library's error-first default (early "dramatic"
+  evidence was contaminated by a wedged dev server). Reverted. Revisit only
+  with instrumented queue evidence (per-tile depth/distance load order logs).
+- **Photoreal rural low-altitude convergence is slow** (Stanford-class areas
+  at errorTarget 3): large workload, not a bug; consider a coarser LOW tier
+  target outside dense-urban coverage if it bothers play.

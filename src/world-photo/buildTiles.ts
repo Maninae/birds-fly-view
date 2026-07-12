@@ -30,7 +30,16 @@ const DEG2RAD = MathUtils.DEG2RAD;
  * PhotoWorld.ts) resident instead of thrashing; still comfortable on a
  * laptop GPU. Library default is 400 MB.
  */
-const LRU_MAX_BYTES = 800 * 1024 * 1024;
+export const LRU_MAX_BYTES = 800 * 1024 * 1024;
+/**
+ * Reduced LRU byte budget while parked (world detached from the scene, no
+ * update ticks). Kept close to LRU_MAX_BYTES because the cache we shrink is
+ * exactly what makes the return warm: dropping to 400MB evicted so many
+ * fine tiles that a resume re-streamed ~1000 tiles in the first few
+ * seconds. 700MB gives dream a bit of headroom while keeping the resident
+ * set intact for a near-zero-fetch return.
+ */
+export const PARKED_LRU_MAX_BYTES = 700 * 1024 * 1024;
 /**
  * Concurrent tile downloads (library default 25). Google serves over HTTP/2,
  * so a deeper in-flight window keeps the parse queue fed while descending
@@ -64,13 +73,19 @@ export interface BuildPhotoTilesOptions {
   originLon: number;
 }
 
+/** Build result: TilesRenderer + a handle to the ReorientationPlugin for live re-anchor. */
+export interface BuildPhotoTilesResult {
+  tiles: TilesRenderer;
+  reorient: ReorientationPlugin;
+}
+
 /**
  * Build a ready-to-attach `TilesRenderer`. Caller still needs to
  *   • `setCamera(camera)` + `setResolutionFromRenderer(...)` each frame,
  *   • add `tiles.group` to the scene graph, and
  *   • drive `tiles.update()` per frame.
  */
-export function buildPhotoTiles(o: BuildPhotoTilesOptions): TilesRenderer {
+export function buildPhotoTiles(o: BuildPhotoTilesOptions): BuildPhotoTilesResult {
   const tiles = new TilesRenderer(o.apiUrl);
 
   tiles.registerPlugin(new GoogleCloudAuthPlugin({
@@ -82,14 +97,16 @@ export function buildPhotoTiles(o: BuildPhotoTilesOptions): TilesRenderer {
   tiles.registerPlugin(new UpdateOnChangePlugin());
   tiles.registerPlugin(new TilesFadePlugin({ fadeDuration: FADE_DURATION_MS }));
   tiles.registerPlugin(new UnloadTilesPlugin());
-  tiles.registerPlugin(new ReorientationPlugin({
+  const reorient = new ReorientationPlugin({
     lat: o.originLat * DEG2RAD,
     lon: o.originLon * DEG2RAD,
     height: 0,
     recenter: true,
-  }));
+  });
+  tiles.registerPlugin(reorient);
 
   tiles.lruCache.maxBytesSize = LRU_MAX_BYTES;
   tiles.downloadQueue.maxJobs = DOWNLOAD_MAX_JOBS;
-  return tiles;
+
+  return { tiles, reorient };
 }

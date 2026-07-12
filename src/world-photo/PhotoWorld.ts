@@ -21,11 +21,16 @@ import type { TilesRenderer } from '3d-tiles-renderer';
 
 import type { GeoPoint, GroundHit, WorldSource } from '../types.js';
 import { GOOGLE_TILES_ROOT } from '../config.js';
-import { buildPhotoTiles } from './buildTiles.js';
+import {
+  buildPhotoTiles,
+  LRU_MAX_BYTES,
+  PARKED_LRU_MAX_BYTES,
+} from './buildTiles.js';
 import { groundBelow } from './ground.js';
 import { photoAttributions } from './attribution.js';
 import { waitForInitialTiles } from './ready.js';
 import { PhotoBvhAccelerator } from './bvh.js';
+import { installDebugHook, uninstallDebugHook } from './debugHook.js';
 
 /** How long init() waits for tiles near origin to load before resolving anyway. */
 const INIT_TIMEOUT_MS = 8000;
@@ -60,6 +65,8 @@ export class PhotoWorld implements WorldSource {
   private camera: PerspectiveCamera | null = null;
   private renderer: WebGLRenderer | null = null;
   private disposed = false;
+  private parked = false;
+  private currentOrigin: GeoPoint | null = null;
 
   // Altitude-adaptive detail state. lastGroundY is refreshed by groundBelow()
   // (the bird's landing probe calls it every frame in flight), so update()
@@ -102,12 +109,13 @@ export class PhotoWorld implements WorldSource {
       );
     }
 
-    const tiles = buildPhotoTiles({
+    const built = buildPhotoTiles({
       apiKey: this.apiKey,
       apiUrl: GOOGLE_TILES_ROOT,
       originLat: origin.lat,
       originLon: origin.lon,
     });
+    const tiles = built.tiles;
     this.tiles = tiles;
 
     tiles.setCamera(this.camera);
@@ -125,6 +133,7 @@ export class PhotoWorld implements WorldSource {
 
     try {
       await waitForInitialTiles(tiles, this.camera, this.renderer, INIT_TIMEOUT_MS);
+      this.currentOrigin = origin;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // Leave tiles attached so a caller can inspect state; dispose() will clean up.
@@ -132,9 +141,73 @@ export class PhotoWorld implements WorldSource {
     }
   }
 
+  /**
+   * Park the live tileset so a return-to-photo skips the cold spin-up.
+   * IN-MEMORY SESSION CACHE ONLY: Google Map Tiles policy forbids persisting
+   * tiles to disk / localStorage / IndexedDB or across page sessions. Parking
+   * only detaches the root Group and pauses updates; the TilesRenderer, its
+   * LRU, and the per-mesh BVHs stay alive in JS heap so a resume re-attaches
+   * without re-streaming visible tiles.
+   */
+  park(): void {
+    if (this.disposed || this.parked || !this.tiles) return;
+    const g = this.tiles.group as unknown as Object3D;
+    if (g.parent) g.parent.remove(g);
+    this.parked = true;
+    // Trim the LRU so a parked world doesn't pin ~800MB while dream flies.
+    // update() is paused, so eviction happens on the next resume tick;
+    // shrinking maxBytesSize immediately arms it.
+    this.tiles.lruCache.maxBytesSize = PARKED_LRU_MAX_BYTES;
+  }
+
+  /**
+   * Resume a parked tileset at either the same origin (fast: just re-attach)
+   * or a new origin (re-anchor via ReorientationPlugin.transformLatLon...
+   * then re-attach). Restores the working-set LRU budget.
+   *
+   * Not a rebuild: the TilesRenderer and BVH cache survive across park.
+   */
+  async resume(_scene: Object3D, origin: GeoPoint): Promise<void> {
+    if (this.disposed) throw new Error('PhotoWorld: disposed');
+    if (!this.tiles) throw new Error('PhotoWorld: resume before init');
+    this.tiles.lruCache.maxBytesSize = LRU_MAX_BYTES;
+    const g = this.tiles.group as unknown as Object3D;
+    const sameOrigin =
+      this.currentOrigin != null &&
+      Math.abs(this.currentOrigin.lat - origin.lat) < 1e-6 &&
+      Math.abs(this.currentOrigin.lon - origin.lon) < 1e-6;
+    if (!sameOrigin) {
+      // Attempted `reorient.transformLatLonHeightToOrigin(...)` here but the
+      // tiles engine's internal traversal state (frustum culling against
+      // world-space tile bounds) does NOT update to match — the result at a
+      // new origin was worse than a cold init (verified headed 2026-07-11:
+      // Stanford re-anchored from Ferry stayed mush even at t+15s). Signal
+      // "cannot resume" so the caller falls back to a fresh build. Keeping
+      // resume for same-origin returns, where it clearly wins.
+      throw new Error('PhotoWorld.resume: cannot re-anchor to a different origin');
+    }
+    this.currentOrigin = origin;
+    if (!g.parent) this.root.add(g);
+    this.parked = false;
+    // Warm-up probe so the caller can observe readiness synchronously;
+    // full LOD refinement happens over the next few update() ticks.
+    if (this.camera && this.renderer) {
+      this.tiles.setResolutionFromRenderer(this.camera, this.renderer);
+      this.tiles.update();
+    }
+  }
+
+  get isParked(): boolean { return this.parked; }
+
+  /** True if the world can already answer a ground probe at the resumed origin. */
+  hasResidentTilesAt(pos: Vector3): boolean {
+    if (this.disposed || this.parked || !this.tiles) return false;
+    return this.groundBelow(pos, 500) !== null;
+  }
+
   update(cameraPos: Vector3, _dt: number): void {
     const tiles = this.tiles;
-    if (!tiles || !this.camera || !this.renderer) return;
+    if (!tiles || !this.camera || !this.renderer || this.parked) return;
     const agl = this.hasGroundSample ? cameraPos.y - this.lastGroundY : cameraPos.y;
     if (this.detailTier === 'low') {
       if (agl > LOW_EXIT_AGL_M) this.detailTier = 'mid';
@@ -179,76 +252,11 @@ export class PhotoWorld implements WorldSource {
       this.tiles.dispose();
       this.tiles = null;
     }
-    uninstallDebugHook(this);
+    uninstallDebugHook();
     this.camera = null;
     this.renderer = null;
   }
 
   // Internal accessor for the debug hook; not on WorldSource.
   getBvhForDebug(): PhotoBvhAccelerator | null { return this.bvh; }
-}
-
-/**
- * Debug window hook: `__bfvBvh` exposes BVH population + a groundBelow
- * micro-benchmark that runs the raycast N times and returns median/p95
- * microseconds. Used by the photoreal smoke test for A/B perf reporting.
- * Idempotent — replaces itself if PhotoWorld is re-inited in the same page.
- */
-interface BvhDebugHook {
-  bvhOff: boolean;
-  count(): number;
-  totalBuilt(): number;
-  totalDisposed(): number;
-  pending(): number;
-  sampleGroundBelow(x: number, y: number, z: number, n?: number, batches?: number): {
-    n: number; batches: number; medianUs: number; p95Us: number;
-    meanUs: number; hitRate: number;
-  };
-}
-
-const _scratchPos = new Vector3();
-
-function installDebugHook(world: PhotoWorld): void {
-  const bvhOff = (globalThis as { __bfvBvhOff?: boolean }).__bfvBvhOff === true;
-  const hook: BvhDebugHook = {
-    bvhOff,
-    count: () => world.getBvhForDebug()?.size() ?? 0,
-    totalBuilt: () => world.getBvhForDebug()?.totalBuilt() ?? 0,
-    totalDisposed: () => world.getBvhForDebug()?.totalDisposed() ?? 0,
-    pending: () => world.getBvhForDebug()?.pendingSize() ?? 0,
-    sampleGroundBelow(x, y, z, n = 200, batches = 20) {
-      // performance.now() is clamped to ~5-20us in browsers (Spectre); a
-      // single raycast reads as 0. Measure `n` calls per batch, take the
-      // wall-clock delta, divide → one mean-per-call sample. `batches`
-      // such samples give a distribution we can median/p95 over.
-      _scratchPos.set(x, y, z);
-      const perCallUs: number[] = [];
-      let totalCalls = 0;
-      let hits = 0;
-      for (let b = 0; b < batches; b++) {
-        const t0 = performance.now();
-        for (let i = 0; i < n; i++) {
-          const hit = world.groundBelow(_scratchPos);
-          if (hit) hits++;
-        }
-        const dtMs = performance.now() - t0;
-        perCallUs.push((dtMs * 1000) / n);
-        totalCalls += n;
-      }
-      perCallUs.sort((a, b) => a - b);
-      const median = perCallUs[Math.floor(perCallUs.length * 0.5)];
-      const p95 = perCallUs[Math.floor(perCallUs.length * 0.95)];
-      const mean = perCallUs.reduce((a, b) => a + b, 0) / perCallUs.length;
-      return {
-        n: totalCalls, batches, medianUs: median, p95Us: p95,
-        meanUs: mean, hitRate: hits / totalCalls,
-      };
-    },
-  };
-  (globalThis as { __bfvBvh?: BvhDebugHook }).__bfvBvh = hook;
-}
-
-function uninstallDebugHook(_world: PhotoWorld): void {
-  const g = globalThis as { __bfvBvh?: BvhDebugHook };
-  if (g.__bfvBvh) delete g.__bfvBvh;
 }

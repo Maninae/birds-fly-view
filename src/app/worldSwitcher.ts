@@ -11,10 +11,32 @@
  * This guards against overlapping takeoffs from rapid clicks or
  * Escape+preset toggling.
  */
-import type { Scene, Vector3 } from 'three';
+import type { Object3D, Scene, Vector3 } from 'three';
 import { GOOGLE_KEY_STORAGE } from '../config';
 import type { GeoPoint, UiApi, WorldKind, WorldSource } from '../types';
 import type { AppFactories } from './App';
+
+/**
+ * Duck-typed park/resume surface — a WorldSource that can be cached in memory
+ * between takeoffs/toggles. Only PhotoWorld implements this today; StylizedWorld
+ * is cheap to rebuild so it stays on the dispose path.
+ *
+ * Session cache only: Google Map Tiles policy forbids persisting tiles to disk
+ * or across page sessions, so the parked instance lives purely in JS heap and
+ * dies with the tab.
+ */
+interface ParkableWorld extends WorldSource {
+  park(): void;
+  resume(scene: Object3D, origin: GeoPoint): Promise<void>;
+  readonly isParked: boolean;
+  hasResidentTilesAt(pos: Vector3): boolean;
+}
+
+function isParkable(w: WorldSource | null): w is ParkableWorld {
+  return !!w
+    && typeof (w as { park?: unknown }).park === 'function'
+    && typeof (w as { resume?: unknown }).resume === 'function';
+}
 
 /** Stored Google key, or empty string when absent or storage is disabled. */
 function storedGoogleKey(): string {
@@ -43,6 +65,13 @@ export class WorldSwitcher {
   // read surface consumed by App (settings panel projection).
   private _worldKind: WorldKind = storedGoogleKey() ? 'photo' : 'dream';
   private lastOrigin: GeoPoint | null = null;
+
+  /**
+   * Parked photoreal world kept warm across dream toggles and same-key
+   * re-takeoffs. In-memory session cache only, dies with the tab.
+   * See ParkableWorld above for the policy comment.
+   */
+  private parkedPhoto: ParkableWorld | null = null;
 
   /** Monotonic id bumped on every entry to a lifecycle operation. */
   private gen = 0;
@@ -83,10 +112,20 @@ export class WorldSwitcher {
     let local: WorldSource | null = null;
 
     try {
-      // Tear down the previous world synchronously (before any await).
+      // Tear down the previous world synchronously (before any await). PARK
+      // (not dispose) a photoreal world so its LRU + BVH cache survives; the
+      // return path resumes it. Dream is cheap so it always disposes.
       if (this.world) {
-        this.scene.remove(this.world.root);
-        this.world.dispose();
+        if (isParkable(this.world) && this._worldKind !== 'photo') {
+          this.parkPhoto(this.world);
+        } else if (isParkable(this.world) && this._worldKind === 'photo') {
+          // Photo → photo takeoff at a new origin: park the OLD world so a
+          // hop back becomes a warm resume too.
+          this.parkPhoto(this.world);
+        } else {
+          this.scene.remove(this.world.root);
+          this.world.dispose();
+        }
         this.world = null;
       }
 
@@ -96,14 +135,41 @@ export class WorldSwitcher {
       // so the user still gets a world.
       const kindAtStart = this._worldKind;
       try {
-        local = await this.buildForKind(kindAtStart);
-        if (this.gen !== myGen) {
-          local.dispose();
-          return null;
+        // Warm resume: reuse the parked photo world for photo takeoffs at
+        // the SAME origin. New-origin re-anchor is intentionally not taken
+        // (see PhotoWorld.resume): the tiles engine's internal state doesn't
+        // migrate cleanly, so a cold init wins there.
+        let resumed = false;
+        if (kindAtStart === 'photo' && this.parkedPhoto) {
+          const parked = this.parkedPhoto;
+          this.parkedPhoto = null;
+          try {
+            this.hooks.onBuilt(parked);
+            await parked.resume(this.scene, origin);
+            if (this.gen !== myGen) {
+              this.parkedPhoto = parked;
+              parked.park();
+              return null;
+            }
+            local = parked;
+            resumed = true;
+          } catch {
+            // Re-anchor refused (different origin) — parked world stays warm
+            // for a future same-origin return, and we build a fresh one here.
+            this.parkedPhoto = parked;
+            parked.park();
+          }
         }
-        this.hooks.onBuilt(local);
-        this.scene.add(local.root);
-        await local.init(origin);
+        if (!resumed) {
+          local = await this.buildForKind(kindAtStart);
+          if (this.gen !== myGen) {
+            local.dispose();
+            return null;
+          }
+          this.hooks.onBuilt(local);
+          this.scene.add(local.root);
+          await local.init(origin);
+        }
       } catch (photoErr) {
         if (this.gen !== myGen) {
           // Stale — dispose our partial and let the newer op speak.
@@ -126,6 +192,7 @@ export class WorldSwitcher {
         this.scene.add(local.root);
         await local.init(origin);
       }
+      if (!local) throw new Error('WorldSwitcher.takeoff: no world after build/resume');
       if (this.gen !== myGen) {
         this.scene.remove(local.root);
         local.dispose();
@@ -190,25 +257,52 @@ export class WorldSwitcher {
     const originAtStart = this.lastOrigin;
     let local: WorldSource | null = null;
 
-    this.ui.setLoading(kind === 'photo' ? 'loading photoreal tiles…' : 'back to the dream…');
+    // Warm-resume gate: dream→photo when a parked photoreal world is on hand
+    // is nearly instant (resume swaps the scene root, doesn't rebuild). Skip
+    // the loading veil entirely so the toggle feels like a mode change, not
+    // a load screen. photo→dream stays veiled because the dream world does
+    // rebuild. Ordering matters: this must be checked BEFORE setLoading, and
+    // must reference parkedPhoto directly (not derive it from `this.world`
+    // typing, which was the bug in the previous version).
+    const warmResume = kind === 'photo' && this.parkedPhoto != null;
+    if (!warmResume) {
+      this.ui.setLoading(kind === 'photo' ? 'loading photoreal tiles…' : 'back to the dream…');
+    }
     try {
       if (this.world) {
-        this.scene.remove(this.world.root);
-        this.world.dispose();
+        if (isParkable(this.world) && kind !== 'photo') {
+          this.parkPhoto(this.world);
+        } else {
+          this.scene.remove(this.world.root);
+          this.world.dispose();
+        }
         this.world = null;
       }
 
-      local = await this.buildForKind(kind, apiKey);
-      if (this.gen !== myGen) {
-        local.dispose();
-        return;
+      if (kind === 'photo' && this.parkedPhoto) {
+        const parked = this.parkedPhoto;
+        this.parkedPhoto = null;
+        this.hooks.onBuilt(parked);
+        await parked.resume(this.scene, originAtStart);
+        if (this.gen !== myGen) {
+          this.parkedPhoto = parked;
+          parked.park();
+          return;
+        }
+        local = parked;
+      } else {
+        local = await this.buildForKind(kind, apiKey);
+        if (this.gen !== myGen) {
+          local.dispose();
+          return;
+        }
+        this.hooks.onBuilt(local);
+        this.scene.add(local.root);
+        await local.init(originAtStart);
       }
-      this.hooks.onBuilt(local);
-      this.scene.add(local.root);
-      await local.init(originAtStart);
       if (this.gen !== myGen) {
         this.scene.remove(local.root);
-        local.dispose();
+        if (isParkable(local)) local.dispose(); else local.dispose();
         return;
       }
       this.world = local;
@@ -266,9 +360,24 @@ export class WorldSwitcher {
       this.world.dispose();
       this.world = null;
     }
+    if (this.parkedPhoto) {
+      this.parkedPhoto.dispose();
+      this.parkedPhoto = null;
+    }
   }
 
   // -- private ------------------------------------------------------------
+
+  /** Park a photoreal world so a later toggle/takeoff can resume it warm. */
+  private parkPhoto(world: ParkableWorld): void {
+    // Only one parked photo at a time; a fresh park replaces the older one.
+    if (this.parkedPhoto && this.parkedPhoto !== world) {
+      this.parkedPhoto.dispose();
+    }
+    // park() removes from the scene and shrinks the LRU.
+    world.park();
+    this.parkedPhoto = world;
+  }
 
   private async buildForKind(kind: WorldKind, apiKey?: string): Promise<WorldSource> {
     if (kind === 'photo' && this.factories.photoWorld) {
