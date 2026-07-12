@@ -24,6 +24,7 @@ import { buildBuildingBuffers, type RoofLookupFn } from './buildingMesh';
 import { buildBridgeBuffers } from './bridges';
 import {
   buildRoadBuffers, buildWaterBuffers, buildGreenBuffers,
+  type WashSampleFn,
 } from './surfaceMesh';
 import { buildTreeInstances } from './trees';
 import { TileCollisionBuilder, type TileCollision } from './collision';
@@ -49,6 +50,11 @@ export interface TileBuilderExtras {
    * covers it. The lookup answers per-footprint centroid queries in O(1).
    */
   roofLookupFor?: (tx: number, ty: number) => RoofLookupFn | null;
+  /**
+   * Phase 2: NAIP wash sampler. When present and covered, `buildGreenBuffers`
+   * multiplies each polygon's tint by the wash color at its centroid.
+   */
+  washSample?: WashSampleFn;
 }
 
 /**
@@ -138,7 +144,7 @@ export function buildTilePayload(
 
   // Green land (parks + wood/grass landcover).
   if (park || landcover || landuse) {
-    const data = buildGreenBuffers({ park, landcover, landuse }, tx, ty, tz, frame, terrain);
+    const data = buildGreenBuffers({ park, landcover, landuse }, tx, ty, tz, frame, terrain, extras.washSample);
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.greenMat);
       mesh.name = 'greens';

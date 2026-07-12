@@ -166,6 +166,12 @@ export class StylizedWorld implements WorldSource {
             const l = this.geodata.roofLookupFor(tx, ty, frame);
             return l ? (x: number, z: number) => l.nearest(x, z) : null;
           },
+          // Phase 2: NAIP wash sampler. Kicks a prefetch on first miss.
+          // Returns null while pending, so the green mesh uses its base
+          // palette (byte-identical to Phase 1) that first frame.
+          washSample: this.geodata.index.anyWash
+            ? (lat, lon) => this.geodata.washSample(lat, lon)
+            : undefined,
         }),
       (tx, ty, tz) => {
         const lat = 0.5 * (tileYToLat(ty, tz) + tileYToLat(ty + 1, tz));
@@ -184,10 +190,19 @@ export class StylizedWorld implements WorldSource {
           this.geodata.prefetchRoofs(tx, ty);
           if (!this.geodata.roofTileCache.peek(tx, ty)) return false;
         }
+        // Phase 2 wash: fire the PNG fetch alongside the tile build. Missing
+        // wash is not blocking; a first pass without wash reads as identity.
+        if (this.geodata.index.hasWash(tx, ty)) {
+          this.geodata.prefetchWash(tx, ty);
+        }
         return true;
       },
-      // Phase 2: streamer eviction drops the per-tile roof cache too.
-      (tx, ty) => this.geodata.dropRoofLookup(tx, ty),
+      (tx, ty) => {
+        // Phase 2: streamer eviction drops the per-tile roof cache and
+        // wash tile too.
+        this.geodata.dropRoofLookup(tx, ty);
+        this.geodata.dropWash(tx, ty);
+      },
     );
     this.root.add(this.streamer.root);
 

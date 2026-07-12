@@ -18,6 +18,7 @@ import { loadManifest, ManifestIndex, geoAssetBase } from './manifest';
 import { isPaintTile, isRoofTile, isTreeTile, JsonTileCache } from './tileFetcher';
 import { RoofLookup } from './roofLookup';
 import { TreesLayer } from './treesLayer';
+import { WashCache } from './washLayer';
 import type { PaintTile, RoofTile, TreeTile } from './types';
 import { getSharedTreeAssets } from '../trees';
 
@@ -37,6 +38,7 @@ export interface GeoDataDeps {
 export class GeoData {
   private manifest: ManifestIndex = new ManifestIndex();
   private heroTerrain: HeroTerrainCache | null = null;
+  private wash: WashCache | null = null;
   private trees: TreesLayer | null = null;
   private treeCache: JsonTileCache<TreeTile>;
   private paintCache: JsonTileCache<PaintTile>;
@@ -83,6 +85,14 @@ export class GeoData {
       // Wire the sampler's fine-source hook so `sample` and `sampleMeshY`
       // prefer z16 elevations where the bake covers.
       this.deps.terrain.setFineSource?.(this.heroTerrain);
+    }
+
+    if (this.manifest.anyWash) {
+      this.wash = new WashCache(
+        (tx, ty) => `${this.baseUrl}wash/14/${tx}/${ty}.png`,
+        this.manifest,
+        14,
+      );
     }
 
     if (this.manifest.anyTrees) {
@@ -140,6 +150,21 @@ export class GeoData {
     this.roofCache.drop(tx, ty);
   }
 
+  /** Phase-2 wash sampler. Null until a covering wash tile has been fetched. */
+  washSample(lat: number, lon: number): { r: number; g: number; b: number } | null {
+    return this.wash ? this.wash.sample(lat, lon) : null;
+  }
+
+  /** Prefetch the wash tile for a z14 tile alongside the vector-tile fetch. */
+  prefetchWash(tx: number, ty: number): void {
+    this.wash?.requestTile(tx, ty);
+  }
+
+  /** Drop the wash tile when the streamer evicts. */
+  dropWash(tx: number, ty: number): void {
+    this.wash?.dropTile(tx, ty);
+  }
+
   /**
    * Update the streaming layers around the camera. Cheap; no-op until
    * `init` resolves. Trees + paint layers gate on hero-ready internally so
@@ -183,6 +208,7 @@ export class GeoData {
     this.disposed = true;
     this.trees?.dispose();
     this.heroTerrain?.dispose();
+    this.wash?.dispose();
     this.treeCache.dispose();
     this.paintCache.dispose();
     this.roofCache.dispose();

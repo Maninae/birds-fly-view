@@ -19,6 +19,7 @@ from bake_paint import emit_paint_tiles
 from bake_roofs import bake_roofs_for_tiles
 from bake_terrain import bake_terrain_for_bboxes
 from bake_trees import bake_trees_for_tiles
+from bake_wash import bake_wash_for_tiles
 from geolib_shim import (
     bbox_3857_of_lonlat_bbox,
     fetch_ept_root,
@@ -119,6 +120,17 @@ def bake_layer_roofs(laz_paths: list[Path], out_root: Path) -> tuple[list[tuple[
     return bake_roofs_for_tiles(tiles, laz_paths, out_root, zoom=14)
 
 
+def bake_layer_wash(out_root: Path) -> tuple[list[tuple[int, int]], int]:
+    """Bake NAIP-derived, dream-warmed wash tiles over SF proper.
+
+    Only tiles the NAIP service serves get a file; missing tiles fall back
+    to the current dream palette unchanged.
+    """
+    tiles = sorted(set(tiles_covering_bbox(*SF_PROPER_BBOX, 14)))
+    logger.info('wash layer target: %d z14 tiles across SF proper', len(tiles))
+    return bake_wash_for_tiles(tiles, out_root, zoom=14)
+
+
 def write_manifest(out_root: Path) -> int:
     """Manifest is a pure function of DISK state, never of what this run baked.
 
@@ -195,6 +207,10 @@ def main() -> None:
         roof_tiles, n_roofs, roof_bytes = bake_layer_roofs(laz_paths, out_root / 'roofs')
         logger.info('roofs: %d tiles, %d roofs, %.1f KB',
                     len(roof_tiles), n_roofs, roof_bytes / 1024)
+
+    if 'wash' in layers:
+        wash_tiles, wash_bytes = bake_layer_wash(out_root / 'wash')
+        logger.info('wash: %d tiles, %.1f KB', len(wash_tiles), wash_bytes / 1024)
 
     manifest_bytes = write_manifest(out_root)
     logger.info('manifest: %d bytes', manifest_bytes)
