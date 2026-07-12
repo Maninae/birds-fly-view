@@ -23,10 +23,10 @@ Method
 
 Coordinates
 -----------
-Footprint rings arrive as (lon, lat) tuples. The `points` argument mirrors the
-tree extractor: a structured array with 'x', 'y' (LiDAR Z, up in meters) and 'z'
-fields where 'x' is the EPT web-mercator X and 'z' is the EPT web-mercator Y.
-Callers pass the tile lonlat bbox so we can project rings once.
+Footprint rings arrive as (lon, lat) tuples. The `points` argument mirrors
+the tree extractor: a dict with 'x' (EPT web-mercator X), 'y' (EPT
+web-mercator Y), and 'z' (NAVD88 orthometric height in meters). See
+tools/geolib/las.py::decode_and_clip.
 """
 from __future__ import annotations
 
@@ -101,31 +101,20 @@ def _points_in_ring(
     """Return a boolean mask of the points inside `ring_xy` (padded).
 
     The ring is treated as EPSG:3857 XY; `x` and `y` must be in the same frame.
+    Fast path: matplotlib.path.Path.contains_points does the point-in-polygon
+    test in C over all bbox-passing points at once.
     """
     minx, miny = ring_xy[:, 0].min() - pad_m, ring_xy[:, 1].min() - pad_m
     maxx, maxy = ring_xy[:, 0].max() + pad_m, ring_xy[:, 1].max() + pad_m
     box = (x >= minx) & (x <= maxx) & (y >= miny) & (y <= maxy)
     if not box.any():
         return box
+    from matplotlib.path import Path
     inside = np.zeros_like(box)
-    xs = ring_xy[:, 0]
-    ys = ring_xy[:, 1]
-    n = len(xs)
     idx = np.flatnonzero(box)
-    px = x[idx]
-    py = y[idx]
-    inside_flags = np.zeros(len(px), dtype=bool)
-    j = n - 1
-    for i in range(n):
-        yi, yj = ys[i], ys[j]
-        cross = (yi > py) != (yj > py)
-        if cross.any():
-            slope = (xs[j] - xs[i]) / ((yj - yi) if (yj - yi) != 0 else 1e-12)
-            xint = slope * (py - yi) + xs[i]
-            hit = cross & (px < xint)
-            inside_flags ^= hit
-        j = i
-    inside[idx] = inside_flags
+    pxpy = np.column_stack([x[idx], y[idx]])
+    path = Path(ring_xy)
+    inside[idx] = path.contains_points(pxpy, radius=pad_m)
     return inside
 
 
@@ -180,9 +169,8 @@ def extract_roofs(
 
     Params
     ------
-    points : dict with 'x', 'y', 'z' arrays; 'x' + 'z' are EPT web-mercator
-        coordinates (matching the tree/terrain extractors), 'y' is meters
-        above ellipsoid.
+    points : dict with 'x' (EPT web-mercator X), 'y' (EPT web-mercator Y),
+        'z' (NAVD88 height meters). See tools/geolib/las.py.
     rings_lonlat : list of (lon, lat) rings.
 
     Returns
@@ -192,10 +180,8 @@ def extract_roofs(
     if not rings_lonlat:
         return []
     px = points['x']
-    py = points['y']
-    pz = points['z']
-    # NOTE: The LAZ arrays in this pipeline use ('x','y','z') with 'x' EPT
-    # mercator X, 'y' elevation, 'z' EPT mercator Y. Guard against reversal.
+    py = points['y']    # EPT mercator Y (used with x for polygon test)
+    pz = points['z']    # NAVD88 orthometric height, meters
     if px.size == 0:
         return []
 
@@ -207,12 +193,12 @@ def extract_roofs(
         area = _ring_area_3857(ring_xy)
         if area < MIN_FOOTPRINT_M2:
             continue
-        mask = _points_in_ring(px, pz, ring_xy, FOOTPRINT_PAD_M)
+        mask = _points_in_ring(px, py, ring_xy, FOOTPRINT_PAD_M)
         n_inside = int(mask.sum())
         if n_inside < MIN_POINTS_PER_BUILDING:
             continue
 
-        ys = py[mask]
+        ys = pz[mask]
         ground = float(np.percentile(ys, 5))
         eave_abs = float(np.percentile(ys, 15))
         top_cutoff = float(np.percentile(ys, 95))
@@ -225,9 +211,9 @@ def extract_roofs(
         rise = max(0.0, ridge_median - eave_abs)
 
         foot_short = _footprint_short_side_m(ring_xy)
-        top_xy_local = np.column_stack([px[mask][top_mask], pz[mask][top_mask]])
+        top_xy_local = np.column_stack([px[mask][top_mask], py[mask][top_mask]])
         shape, ridge_deg = _classify_shape(
-            np.column_stack([px[mask], pz[mask]]),
+            np.column_stack([px[mask], py[mask]]),
             top_xy_local, rise, foot_short,
         )
         if shape == SHAPE_FLAT:
