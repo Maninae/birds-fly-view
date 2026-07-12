@@ -15,9 +15,10 @@ import { TerrainSampler } from '../../geo/terrain';
 import { TERRAIN_ZOOM } from '../../config';
 import { HeroTerrainCache } from './heroTerrain';
 import { loadManifest, ManifestIndex, geoAssetBase } from './manifest';
-import { isPaintTile, isTreeTile, JsonTileCache } from './tileFetcher';
+import { isPaintTile, isRoofTile, isTreeTile, JsonTileCache } from './tileFetcher';
+import { RoofLookup } from './roofLookup';
 import { TreesLayer } from './treesLayer';
-import type { PaintTile, TreeTile } from './types';
+import type { PaintTile, RoofTile, TreeTile } from './types';
 import { getSharedTreeAssets } from '../trees';
 
 /** All the pieces the coordinator needs, wired to a single manifest. */
@@ -39,6 +40,9 @@ export class GeoData {
   private trees: TreesLayer | null = null;
   private treeCache: JsonTileCache<TreeTile>;
   private paintCache: JsonTileCache<PaintTile>;
+  private roofCache: JsonTileCache<RoofTile>;
+  /** Cached RoofLookup per z14 tile (built lazily on the first synchronous ask). */
+  private roofLookupByTile = new Map<string, RoofLookup>();
   private baseUrl = geoAssetBase();
   private ready = false;
   private disposed = false;
@@ -52,6 +56,10 @@ export class GeoData {
     this.paintCache = new JsonTileCache<PaintTile>(
       (tx, ty) => `${base}paint/14/${tx}/${ty}.json`,
       isPaintTile,
+    );
+    this.roofCache = new JsonTileCache<RoofTile>(
+      (tx, ty) => `${base}roofs/14/${tx}/${ty}.json`,
+      isRoofTile,
     );
   }
 
@@ -94,6 +102,43 @@ export class GeoData {
   get index(): ManifestIndex { return this.manifest; }
   get heroTerrainCache(): HeroTerrainCache | null { return this.heroTerrain; }
   get paintTileCache(): JsonTileCache<PaintTile> { return this.paintCache; }
+  get roofTileCache(): JsonTileCache<RoofTile> { return this.roofCache; }
+
+  /**
+   * Prefetch the roof records for a z14 tile so the RoofLookup is ready by
+   * the time the vector-tile builder asks for it. Called by the streamer
+   * alongside the vector-tile fetch.
+   */
+  prefetchRoofs(tx: number, ty: number): void {
+    if (!this.ready || this.disposed) return;
+    if (!this.manifest.hasRoofs(tx, ty)) return;
+    void this.roofCache.get(tx, ty);
+  }
+
+  /**
+   * Synchronous roof-lookup for a z14 tile. Returns null if the manifest
+   * doesn't cover the tile, or if the JSON hasn't finished loading (in
+   * which case the builder falls back to flat-prism and gets pitched roofs
+   * next time the tile is built).
+   */
+  roofLookupFor(tx: number, ty: number, frame: EnuFrame): import('./roofLookup').RoofLookup | null {
+    if (!this.ready || this.disposed) return null;
+    if (!this.manifest.hasRoofs(tx, ty)) return null;
+    const key = `${tx}/${ty}`;
+    const hit = this.roofLookupByTile.get(key);
+    if (hit) return hit;
+    const tile = this.roofCache.peek(tx, ty);
+    if (!tile) return null;
+    const lookup = new RoofLookup(tile, frame);
+    this.roofLookupByTile.set(key, lookup);
+    return lookup;
+  }
+
+  /** Drop a per-tile roof lookup when the streamer evicts the tile. */
+  dropRoofLookup(tx: number, ty: number): void {
+    this.roofLookupByTile.delete(`${tx}/${ty}`);
+    this.roofCache.drop(tx, ty);
+  }
 
   /**
    * Update the streaming layers around the camera. Cheap; no-op until
@@ -140,6 +185,8 @@ export class GeoData {
     this.heroTerrain?.dispose();
     this.treeCache.dispose();
     this.paintCache.dispose();
+    this.roofCache.dispose();
+    this.roofLookupByTile.clear();
     this.deps.terrain.setFineSource?.(null);
   }
 }
@@ -152,7 +199,12 @@ function geoToTileZ12(lat: number, lon: number): { x: number; y: number } {
 export { ManifestIndex } from './manifest';
 export { HeroTerrainCache } from './heroTerrain';
 export type { FineElevationSource } from './heroTerrain';
-export { JsonTileCache, isTreeTile, isPaintTile } from './tileFetcher';
+export { JsonTileCache, isTreeTile, isPaintTile, isRoofTile } from './tileFetcher';
+export { RoofLookup, ROOF_MATCH_TOLERANCE_M } from './roofLookup';
 export { TreesLayer, stampTreesForTile } from './treesLayer';
-export type { AssetManifest, PaintKind, PaintTile, TreeTile, TreeInstance } from './types';
-export { PAINT_KINDS, e7ToDeg, dmToM } from './types';
+export type {
+  AssetManifest, LandmarkManifestEntry,
+  PaintKind, PaintTile, TreeTile, TreeInstance,
+  RoofTile, RoofRecord, RoofShape,
+} from './types';
+export { PAINT_KINDS, e7ToDeg, dmToM, ROOF_FLAT, ROOF_GABLE, ROOF_HIP } from './types';

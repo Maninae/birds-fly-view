@@ -109,6 +109,31 @@ export function isPaintTile(v: unknown): v is import('./types').PaintTile {
   return isArrayOr(obj.ribbons) && isArrayOr(obj.polygons) && isArrayOr(obj.decals);
 }
 
+/**
+ * JSON validator for RoofTile: `{ roofs: RoofRecord[] }`. Walks each record
+ * because malformed roof entries would render as garbage geometry (Phase-1
+ * paint NaN cascade taught us shallow validators are risky).
+ */
+export function isRoofTile(v: unknown): v is import('./types').RoofTile {
+  if (!v || typeof v !== 'object') return false;
+  const roofs = (v as { roofs?: unknown }).roofs;
+  if (!Array.isArray(roofs)) return false;
+  for (let i = 0; i < roofs.length; i++) {
+    const r = roofs[i];
+    if (!r || typeof r !== 'object') return false;
+    const at = (r as { at?: unknown }).at;
+    if (!Array.isArray(at) || at.length !== 2) return false;
+    if (typeof at[0] !== 'number' || typeof at[1] !== 'number') return false;
+    const shape = (r as { shape?: unknown }).shape;
+    if (shape !== 0 && shape !== 1 && shape !== 2) return false;
+    for (const key of ['eave_dm', 'rise_dm', 'ridge_cdeg']) {
+      const val = (r as Record<string, unknown>)[key];
+      if (typeof val !== 'number' || !Number.isFinite(val)) return false;
+    }
+  }
+  return true;
+}
+
 function isArrayOr(v: unknown): boolean {
   return v === undefined || Array.isArray(v);
 }

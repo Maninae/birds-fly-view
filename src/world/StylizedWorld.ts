@@ -156,6 +156,16 @@ export class StylizedWorld implements WorldSource {
           bridgeMat: this.bridgeMat,
         }, edges, {
           skipProceduralTreesFor: (tx, ty) => this.geodata.skipProceduralTreesFor(tx, ty),
+          // Phase 2: expose the per-tile roof lookup to the builder. Returns
+          // null when the manifest has no coverage OR the JSON hasn't landed
+          // yet (in which case the tile is flat-prism this build, pitched on
+          // the next rebuild once the fetch resolves).
+          roofLookupFor: (tx, ty) => {
+            const frame = this.frame;
+            if (!frame) return null;
+            const l = this.geodata.roofLookupFor(tx, ty, frame);
+            return l ? (x: number, z: number) => l.nearest(x, z) : null;
+          },
         }),
       (tx, ty, tz) => {
         const lat = 0.5 * (tileYToLat(ty, tz) + tileYToLat(ty + 1, tz));
@@ -165,8 +175,19 @@ export class StylizedWorld implements WorldSource {
         // z16 child is resident. Building drape samples fine elevations via
         // `sampleMeshY`; a build that races the hero fetch would freeze a
         // mix of fine/coarse into vertex buffers and floats over the mesh.
-        return this.geodata.isHeroReadyForZ14(tx, ty);
+        if (!this.geodata.isHeroReadyForZ14(tx, ty)) return false;
+        // Phase 2: when the manifest covers this tile with a roof bake,
+        // kick the JSON fetch and wait for it before building. Roof records
+        // arriving after the build would leave a flat-prism silhouette
+        // until the next rebuild fires (Phase 1's paint NaN lesson).
+        if (this.geodata.index.hasRoofs(tx, ty)) {
+          this.geodata.prefetchRoofs(tx, ty);
+          if (!this.geodata.roofTileCache.peek(tx, ty)) return false;
+        }
+        return true;
       },
+      // Phase 2: streamer eviction drops the per-tile roof cache too.
+      (tx, ty) => this.geodata.dropRoofLookup(tx, ty),
     );
     this.root.add(this.streamer.root);
 

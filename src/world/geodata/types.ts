@@ -32,11 +32,28 @@ export interface ManifestLayer {
   tiles: string[];
 }
 
-/** Root asset manifest. Runtime fetches once at world init. */
+/** Root asset manifest. Runtime fetches once at world init.
+ *
+ * Backward compat: any unknown keys are ignored by the runtime, and any
+ * absent key means "no coverage" for that layer. A Phase-1 runtime must
+ * work against a Phase-2 manifest and vice versa.
+ */
 export interface AssetManifest {
   trees?: { tiles: string[] };
   terrain?: { zoom: number; tiles: string[] };
   paint?: { tiles: string[] };
+  roofs?: { tiles: string[] };
+  wash?: { tiles: string[] };
+  landmarks?: LandmarkManifestEntry[];
+}
+
+/** Phase-2 landmark manifest entry. See docs/DATA_DREAM_PHASE2.md. */
+export interface LandmarkManifestEntry {
+  id: string;
+  lat_e7: number;
+  lon_e7: number;
+  /** GLB filename served under public/geo/landmarks/. */
+  mesh: string;
 }
 
 /** One tree instance from a z14 trees tile. */
@@ -86,6 +103,30 @@ export interface PaintTile {
   ribbons: PaintRibbon[];
   polygons: PaintPolygon[];
   decals: PaintDecal[];
+}
+
+/** Phase-2 roof shape codes. LOCKED with the bake pipeline. */
+export type RoofShape = 0 | 1 | 2;      // 0 = flat, 1 = gable, 2 = hip
+export const ROOF_FLAT: RoofShape = 0;
+export const ROOF_GABLE: RoofShape = 1;
+export const ROOF_HIP: RoofShape = 2;
+
+/** One classified roof record from the LiDAR bake. */
+export interface RoofRecord {
+  /** Centroid of the classified footprint. */
+  at: [number, number];       // [lon_e7, lat_e7]
+  shape: RoofShape;
+  /** Height in decimeters of the eave (top of walls) above ground. */
+  eave_dm: number;
+  /** Height in decimeters of the ridge above the eave. 0 for flat. */
+  rise_dm: number;
+  /** Ridge azimuth in compass centi-degrees (0..35999). 0 for flat. */
+  ridge_cdeg: number;
+}
+
+/** JSON shape at public/geo/roofs/14/{x}/{y}.json */
+export interface RoofTile {
+  roofs: RoofRecord[];
 }
 
 /** Convert integer _e7 coordinate to a JS float degree. */

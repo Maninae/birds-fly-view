@@ -31,6 +31,9 @@ export class ManifestIndex {
   private trees = new Set<string>();
   private terrain = new Set<string>();
   private paint = new Set<string>();
+  private roofs = new Set<string>();
+  private wash = new Set<string>();
+  private _landmarks: import('./types').LandmarkManifestEntry[] = [];
   private _terrainZoom = 16;
 
   constructor(manifest?: AssetManifest) {
@@ -45,6 +48,9 @@ export class ManifestIndex {
       }
     }
     if (manifest.paint?.tiles) for (const k of manifest.paint.tiles) this.paint.add(k);
+    if (manifest.roofs?.tiles) for (const k of manifest.roofs.tiles) this.roofs.add(k);
+    if (manifest.wash?.tiles) for (const k of manifest.wash.tiles) this.wash.add(k);
+    if (Array.isArray(manifest.landmarks)) this._landmarks = manifest.landmarks;
   }
 
   /** z14 tile has a real-tree bake. */
@@ -79,10 +85,27 @@ export class ManifestIndex {
     return this.terrain.has(`${tx16}/${ty16}`);
   }
 
+  /** z14 tile has a roof-classification bake (Phase 2). */
+  hasRoofs(tx: number, ty: number): boolean {
+    return this.roofs.has(`${tx}/${ty}`);
+  }
+
+  /** z14 tile has a NAIP wash tile (Phase 2). */
+  hasWash(tx: number, ty: number): boolean {
+    return this.wash.has(`${tx}/${ty}`);
+  }
+
+  /** Phase-2 landmark entries. Empty when the manifest omits them. */
+  get landmarks(): readonly import('./types').LandmarkManifestEntry[] {
+    return this._landmarks;
+  }
+
   get terrainZoom(): number { return this._terrainZoom; }
   get anyTrees(): boolean { return this.trees.size > 0; }
   get anyPaint(): boolean { return this.paint.size > 0; }
   get anyHeroTerrain(): boolean { return this.terrain.size > 0; }
+  get anyRoofs(): boolean { return this.roofs.size > 0; }
+  get anyWash(): boolean { return this.wash.size > 0; }
 }
 
 /**
