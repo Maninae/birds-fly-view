@@ -22,7 +22,7 @@ export const ROOF_MATCH_TOLERANCE_M = 6.0;
 /** Bucket size in world meters. 10m keeps bucket occupancy low for SF blocks. */
 const BUCKET_SIZE_M = 10;
 
-interface Bucket { xs: number[]; zs: number[]; recs: RoofRecord[]; }
+interface Bucket { xs: number[]; zs: number[]; recs: RoofRecord[]; claimed: boolean[]; }
 
 /** Per-tile lookup keyed by the tile's z14 (tx, ty). Cheap to construct. */
 export class RoofLookup {
@@ -39,30 +39,39 @@ export class RoofLookup {
       const kz = Math.floor(p.z / BUCKET_SIZE_M);
       const key = `${kx}/${kz}`;
       let b = this.buckets.get(key);
-      if (!b) { b = { xs: [], zs: [], recs: [] }; this.buckets.set(key, b); }
-      b.xs.push(p.x); b.zs.push(p.z); b.recs.push(r);
+      if (!b) { b = { xs: [], zs: [], recs: [], claimed: [] }; this.buckets.set(key, b); }
+      b.xs.push(p.x); b.zs.push(p.z); b.recs.push(r); b.claimed.push(false);
     }
   }
 
-  /** Nearest roof record within ROOF_MATCH_TOLERANCE_M, or null. */
+  /**
+   * Nearest UNCLAIMED roof record within ROOF_MATCH_TOLERANCE_M, or null.
+   * The winner is claimed so a second runtime footprint (subdivided lot,
+   * ADU, snapshot drift) cannot share it: one record dresses one building,
+   * contenders fall back to the flat-prism path per spec.
+   */
   nearest(worldX: number, worldZ: number): RoofRecord | null {
     const kx = Math.floor(worldX / BUCKET_SIZE_M);
     const kz = Math.floor(worldZ / BUCKET_SIZE_M);
-    let best: RoofRecord | null = null;
+    let best: Bucket | null = null;
+    let bestI = -1;
     let bestDsq = this.tolSq;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
         const b = this.buckets.get(`${kx + dx}/${kz + dz}`);
         if (!b) continue;
         for (let i = 0; i < b.recs.length; i++) {
+          if (b.claimed[i]) continue;
           const ex = b.xs[i] - worldX;
           const ez = b.zs[i] - worldZ;
           const d = ex * ex + ez * ez;
-          if (d < bestDsq) { bestDsq = d; best = b.recs[i]; }
+          if (d < bestDsq) { bestDsq = d; best = b; bestI = i; }
         }
       }
     }
-    return best;
+    if (!best) return null;
+    best.claimed[bestI] = true;
+    return best.recs[bestI];
   }
 
   get size(): number {

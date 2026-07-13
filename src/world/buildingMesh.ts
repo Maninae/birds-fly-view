@@ -18,7 +18,7 @@ import { Color, Vector2 } from 'three';
 import type { VectorTileLayer } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
-import { parseBuildingHeights, sanityCheckHeight } from './buildingHeights';
+import { lidarEaveIsTrustworthy, parseBuildingHeights, sanityCheckHeight } from './buildingHeights';
 import {
   extractPolygons, appendPolygonFlat, featureAnchorInTile,
   ringArea, ringBounds, ringCentroid, ProjectedPoly,
@@ -189,7 +189,12 @@ export function buildBuildingBuffers(
       const roofRec = roofLookup ? roofLookup(c.x, c.z) : null;
       if (roofRec) {
         const eaveM = roofRec.eave_dm / 10;
-        safeHeight = sanityCheckHeight(eaveM, areaM2);
+        // Bake-quality guard: an implausibly low LiDAR eave keeps the OSM
+        // wall height (see lidarEaveIsTrustworthy); the pitched roof from
+        // the record still renders on top of whichever wall top wins.
+        if (lidarEaveIsTrustworthy(eaveM, safeHeight)) {
+          safeHeight = sanityCheckHeight(eaveM, areaM2);
+        }
       }
       const baseY = minGroundY - BASE_SINK_M + heights.base;
       const topY = centroidY + safeHeight;

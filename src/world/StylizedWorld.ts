@@ -188,7 +188,13 @@ export class StylizedWorld implements WorldSource {
         // until the next rebuild fires (Phase 1's paint NaN lesson).
         if (this.geodata.index.hasRoofs(tx, ty)) {
           this.geodata.prefetchRoofs(tx, ty);
-          if (!this.geodata.roofTileCache.peek(tx, ty)) return false;
+          // Wait for the roof JSON, but NEVER forever: a terminally-failed
+          // fetch resolves as a coverage hole and the tile builds with the
+          // flat-prism path (else one bad asset blanks the tile all session).
+          if (
+            !this.geodata.roofTileCache.peek(tx, ty) &&
+            !this.geodata.roofTileCache.resolvedEmpty(tx, ty)
+          ) return false;
         }
         // Phase 2 wash: fire the PNG fetch alongside the tile build. Missing
         // wash is not blocking; a first pass without wash reads as identity.

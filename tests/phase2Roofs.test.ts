@@ -12,6 +12,8 @@ import {
 import {
   RoofLookup, ROOF_MATCH_TOLERANCE_M,
 } from '../src/world/geodata/roofLookup';
+import { lidarEaveIsTrustworthy } from '../src/world/buildingHeights';
+import { JsonTileCache } from '../src/world/geodata/tileFetcher';
 import { EnuFrame } from '../src/geo/mercator';
 import { emitPitchedRoof } from '../src/world/pitchedRoof';
 
@@ -109,5 +111,57 @@ describe('emitPitchedRoof', () => {
     emitPitchedRoof(square, 10, { shape: 1, rise_dm: 0, ridge_cdeg: 0 },
                     color, pos, [], [], []);
     expect(pos.length).toBe(0);
+  });
+});
+
+describe('review-fix regressions', () => {
+  const frame = new EnuFrame({ lat: 37.79, lon: -122.40 });
+
+  it('one record dresses one building: second nearby footprint gets null (M3)', () => {
+    const lookup = new RoofLookup(OK_TILE, frame);
+    const lon = -122.4000, lat = 37.7900;
+    const p = frame.geoToEnu(lat, lon);
+    const first = lookup.nearest(p.x, p.z);
+    expect(first).not.toBe(null);
+    // A second footprint 3m away (subdivided rowhouse) must NOT share it.
+    const second = lookup.nearest(p.x + 3, p.z);
+    expect(second === first).toBe(false);
+  });
+
+  it('lidarEaveIsTrustworthy rejects ground-ring noise, accepts real eaves (M2)', () => {
+    expect(lidarEaveIsTrustworthy(0, 8)).toBe(false);     // buried record
+    expect(lidarEaveIsTrustworthy(1.5, 8)).toBe(false);   // under absolute floor
+    expect(lidarEaveIsTrustworthy(2.5, 8)).toBe(false);   // < 40% of OSM height
+    expect(lidarEaveIsTrustworthy(6.5, 8)).toBe(true);    // Victorian-sane
+    expect(lidarEaveIsTrustworthy(3.0, 5)).toBe(true);    // small house, plausible
+    expect(lidarEaveIsTrustworthy(40, 12)).toBe(true);    // LiDAR taller than OSM: trust it
+  });
+
+  it('roof tile cache resolves as coverage hole after repeated failures (C1)', async () => {
+    let served = 0;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      served++;
+      return { ok: false, status: 404 } as unknown as Response;
+    }) as typeof fetch;
+    const cache = new JsonTileCache((x, y) => `t://${x}/${y}.json`, isRoofTile);
+    // Rounds 1..3: each get() retries; not yet terminal until the third fails.
+    for (let round = 1; round <= 3; round++) {
+      expect(cache.resolvedEmpty(5, 7)).toBe(false);
+      await cache.get(5, 7);
+    }
+    // Terminal: the readiness gate must treat this as a hole and build flat.
+    expect(cache.resolvedEmpty(5, 7)).toBe(true);
+    expect(cache.peek(5, 7)).toBe(null);
+    // No further fetches once terminal.
+    await cache.get(5, 7);
+    expect(served).toBe(3);
+    // drop() grants a fresh retry budget (re-entry after eviction).
+    cache.drop(5, 7);
+    expect(cache.resolvedEmpty(5, 7)).toBe(false);
+    await cache.get(5, 7);
+    expect(served).toBe(4);
+    globalThis.fetch = realFetch;
+    cache.dispose();
   });
 });

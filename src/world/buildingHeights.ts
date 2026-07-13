@@ -75,3 +75,19 @@ function truthy(v: unknown): boolean {
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
+
+/** Minimum plausible LiDAR eave (m); below this the bake row is ground-ring noise. */
+export const LIDAR_EAVE_MIN_M = 2.0;
+/** LiDAR eave must also reach this fraction of the OSM height to override it. */
+export const LIDAR_EAVE_MIN_FRAC = 0.4;
+
+/**
+ * Whether a bake-provided LiDAR eave may replace the OSM wall height.
+ *
+ * Ground returns inside the bake's footprint pad dragged 45% of first-bake
+ * eaves under 2m; an unguarded override buries those walls entirely (the
+ * pitched roof still renders either way, so a rejected eave costs nothing).
+ */
+export function lidarEaveIsTrustworthy(eaveM: number, osmHeightM: number): boolean {
+  return eaveM >= LIDAR_EAVE_MIN_M && eaveM >= LIDAR_EAVE_MIN_FRAC * osmHeightM;
+}

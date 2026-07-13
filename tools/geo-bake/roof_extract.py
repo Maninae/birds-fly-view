@@ -9,10 +9,12 @@ Method
 - Points inside the polygon (2D XZ), padded by ~0.5m for boundary noise.
 - Ground plane = 5th percentile Y (LiDAR sees ground rings around most SF
   building footprints in the depth-8 cache).
-- Eave = 15th percentile Y relative to that ground (most points on a peaked
-  roof cluster near the eave, not the ridge; a flat roof clusters near the top).
-- Ridge candidates = top 5% Y relative to ground.
-- Rise = ridge_median - eave.
+- Structure points = points > 2m above ground. Eave/ridge percentiles run
+  over structure only: ground rings inside the pad otherwise drag the eave
+  toward zero and bury the walls (first-bake lesson: 45% of eaves < 2m).
+- Eave = 15th percentile of structure Y; ridge candidates = top 5%.
+- Rise = ridge_median - eave, pre-clamped at emit (0.5 x short side, 12m).
+- Records with eave < 2m or too few structure points are NOT emitted.
 - Shape decision:
   * FLAT if rise < FLAT_RISE_MIN_M OR rise / min(width, depth) < FLAT_RATIO
   * GABLE if the top-15% cluster fits a line in XZ (PCA principal axis) with
@@ -51,6 +53,13 @@ MIN_POINTS_PER_BUILDING = 20
 
 # How far to pad the polygon (EPSG:3857 meters) when gathering interior points.
 FOOTPRINT_PAD_M = 0.5
+# Structure separation: eave/ridge percentiles use only points this far
+# above the 5th-pct ground, so yard/street returns cannot drag them down.
+MIN_STRUCT_ABOVE_GROUND_M = 2.0
+MIN_STRUCT_POINTS = 30
+# Never emit records the runtime would reject anyway.
+MIN_EMIT_EAVE_M = 2.0
+MAX_RISE_EMIT_M = 12.0
 
 SHAPE_FLAT = 0
 SHAPE_GABLE = 1
@@ -119,10 +128,16 @@ def _points_in_ring(
 
 
 def _classify_shape(
-    xy: np.ndarray, top_xy: np.ndarray, rise: float, foot_short: float,
+    top_xy: np.ndarray, rise: float, foot_short_m: float, cos_lat: float,
 ) -> tuple[int, float]:
-    """Return (shape, ridge_deg). Ridge_deg is 0 when shape==FLAT."""
-    if rise < FLAT_RISE_MIN_M or rise / max(foot_short, 1e-3) < FLAT_RATIO:
+    """Return (shape, ridge_deg). Ridge_deg is 0 when shape==FLAT.
+
+    foot_short_m is in GROUND meters; rise is NAVD88 meters, so the FLAT
+    ratio compares like units (EPSG:3857 lengths are sec(lat) inflated,
+    ~26% at SF - the Phase-1 crown-radius bug class). top_xy stays in
+    3857; line widths get the same cos_lat scale so ratios stay consistent.
+    """
+    if rise < FLAT_RISE_MIN_M or rise / max(foot_short_m, 1e-3) < FLAT_RATIO:
         return SHAPE_FLAT, 0.0
 
     # PCA on top-15% XY cluster in the footprint frame.
@@ -140,8 +155,8 @@ def _classify_shape(
     if short_var <= 0 or long_var <= 0:
         return SHAPE_HIP, 0.0
     elongation = math.sqrt(long_var / short_var)
-    line_width = math.sqrt(short_var) * 2  # ~1 sigma diameter
-    line_width_ratio = line_width / max(foot_short, 1e-3)
+    line_width_m = math.sqrt(short_var) * 2 * cos_lat  # ~1 sigma diameter, ground m
+    line_width_ratio = line_width_m / max(foot_short_m, 1e-3)
     if elongation >= GABLE_ELONGATION_MIN and line_width_ratio <= GABLE_LINE_WIDTH_RATIO:
         # Azimuth in compass frame: 0 = +Y (north), CW positive. Long axis
         # in EPSG:3857 is (dx, dy). Compass = atan2(dx, dy), degrees.
@@ -200,28 +215,41 @@ def extract_roofs(
 
         ys = pz[mask]
         ground = float(np.percentile(ys, 5))
-        eave_abs = float(np.percentile(ys, 15))
-        top_cutoff = float(np.percentile(ys, 95))
-        top_mask = ys >= top_cutoff
+        # Structure/ground separation. Percentiles over ALL masked points let
+        # the ground rings the footprint pad drags in dominate BOTH ground
+        # and eave (45% of the first bake's eaves sat under 2m, burying the
+        # walls). Eave and ridge come from above-ground structure only.
+        struct_sel = ys > ground + MIN_STRUCT_ABOVE_GROUND_M
+        if int(struct_sel.sum()) < MIN_STRUCT_POINTS:
+            continue    # no reliable structure: runtime keeps flat-prism path
+        sy = ys[struct_sel]
+        sx = px[mask][struct_sel]
+        sz = py[mask][struct_sel]
+        eave_abs = float(np.percentile(sy, 15))
+        top_cutoff = float(np.percentile(sy, 95))
+        top_mask = sy >= top_cutoff
         if int(top_mask.sum()) < 5:
             # Too few ridge candidates; treat as flat if elevation range is small.
-            top_mask = ys >= float(np.percentile(ys, 90))
-        ridge_median = float(np.median(ys[top_mask]))
+            top_mask = sy >= float(np.percentile(sy, 90))
+        ridge_median = float(np.median(sy[top_mask]))
         eave_h = max(0.0, eave_abs - ground)
         rise = max(0.0, ridge_median - eave_abs)
-
-        foot_short = _footprint_short_side_m(ring_xy)
-        top_xy_local = np.column_stack([px[mask][top_mask], py[mask][top_mask]])
-        shape, ridge_deg = _classify_shape(
-            np.column_stack([px[mask], py[mask]]),
-            top_xy_local, rise, foot_short,
-        )
-        if shape == SHAPE_FLAT:
-            rise = 0.0
-            ridge_deg = 0.0
+        if eave_h < MIN_EMIT_EAVE_M:
+            continue    # still ground-dominated: never emit a known-bad record
 
         centroid_xy = _ring_centroid_3857(ring_xy)
         clon, clat = _3857_to_lonlat(*centroid_xy)
+        cos_lat = math.cos(math.radians(clat))
+        foot_short_m = _footprint_short_side_m(ring_xy) * cos_lat
+        top_xy_local = np.column_stack([sx[top_mask], sz[top_mask]])
+        shape, ridge_deg = _classify_shape(top_xy_local, rise, foot_short_m, cos_lat)
+        if shape == SHAPE_FLAT:
+            rise = 0.0
+            ridge_deg = 0.0
+        else:
+            # Pre-clamp at emit so the asset is honest (tower bleed produced
+            # 200m+ rises); mirrors the runtime clamp in pitchedRoof.ts.
+            rise = min(rise, 0.5 * foot_short_m, MAX_RISE_EMIT_M)
         results.append(RoofRecord(
             centroid_lon=clon,
             centroid_lat=clat,

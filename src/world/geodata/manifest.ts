@@ -34,7 +34,6 @@ export class ManifestIndex {
   private roofs = new Set<string>();
   private wash = new Set<string>();
   private _landmarks: import('./types').LandmarkManifestEntry[] = [];
-  private _terrainZoom = 16;
 
   constructor(manifest?: AssetManifest) {
     if (!manifest) return;
@@ -100,7 +99,8 @@ export class ManifestIndex {
     return this._landmarks;
   }
 
-  get terrainZoom(): number { return this._terrainZoom; }
+  /** Hero terrain is z16 by contract; non-16 manifests read as no coverage. */
+  get terrainZoom(): number { return 16; }
   get anyTrees(): boolean { return this.trees.size > 0; }
   get anyPaint(): boolean { return this.paint.size > 0; }
   get anyHeroTerrain(): boolean { return this.terrain.size > 0; }

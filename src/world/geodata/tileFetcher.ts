@@ -10,16 +10,21 @@
 
 /** Cap loaded JSON payloads per fetcher instance. Small: JSON parsed once, then stored. */
 const MAX_LOADED = 256;
+/** After this many failed fetches a tile resolves as a permanent coverage hole. */
+const MAX_FETCH_ATTEMPTS = 3;
 
 interface Entry<T> {
   promise: Promise<T | null>;
   parsed: T | null;
+  /** Terminal state: parsed successfully OR gave up after MAX_FETCH_ATTEMPTS. */
+  resolved: boolean;
   lastUsed: number;
 }
 
 /** JSON tile fetcher. `pathFor` receives (tx, ty) and returns a URL string. */
 export class JsonTileCache<T> {
   private entries = new Map<string, Entry<T>>();
+  private failCounts = new Map<string, number>();
   private clock = 0;
   private disposed = false;
 
@@ -30,8 +35,10 @@ export class JsonTileCache<T> {
 
   /**
    * Returns the parsed tile JSON, or null on any error (404, parse fail,
-   * shape mismatch). Dedupes in-flight requests. On a second call after a
-   * successful parse this is synchronous-in-microtask (the resolved promise).
+   * shape mismatch). Dedupes in-flight requests. A failed tile is retried
+   * on later get() calls up to MAX_FETCH_ATTEMPTS, then resolves as a
+   * permanent empty: gates polling peek()/resolvedEmpty() must never block
+   * forever on one bad asset (the hero-terrain deadlock lesson, twice).
    */
   get(tx: number, ty: number): Promise<T | null> {
     if (this.disposed) return Promise.resolve(null);
@@ -42,9 +49,24 @@ export class JsonTileCache<T> {
       return hit.promise;
     }
     const promise = this.fetchAndParse(tx, ty);
-    const entry: Entry<T> = { promise, parsed: null, lastUsed: ++this.clock };
+    const entry: Entry<T> = { promise, parsed: null, resolved: false, lastUsed: ++this.clock };
     this.entries.set(key, entry);
-    void promise.then((v) => { entry.parsed = v; });
+    void promise.then((v) => {
+      if (this.disposed) return;
+      if (v !== null) {
+        entry.parsed = v;
+        entry.resolved = true;
+        this.failCounts.delete(key);
+        return;
+      }
+      const fails = (this.failCounts.get(key) ?? 0) + 1;
+      this.failCounts.set(key, fails);
+      if (fails >= MAX_FETCH_ATTEMPTS) {
+        entry.resolved = true;      // terminal empty: coverage hole
+      } else {
+        this.entries.delete(key);   // a later get() retries
+      }
+    });
     this.evict();
     return promise;
   }
@@ -54,14 +76,23 @@ export class JsonTileCache<T> {
     return this.entries.get(`${tx}/${ty}`)?.parsed ?? null;
   }
 
+  /** True iff the tile terminally failed: readiness gates treat it as a hole. */
+  resolvedEmpty(tx: number, ty: number): boolean {
+    const e = this.entries.get(`${tx}/${ty}`);
+    return !!e && e.resolved && e.parsed === null;
+  }
+
   /** Drop a specific tile from the cache (e.g. eviction from a layer). */
   drop(tx: number, ty: number): void {
-    this.entries.delete(`${tx}/${ty}`);
+    const key = `${tx}/${ty}`;
+    this.entries.delete(key);
+    this.failCounts.delete(key);   // re-entry gets a fresh retry budget
   }
 
   dispose(): void {
     this.disposed = true;
     this.entries.clear();
+    this.failCounts.clear();
   }
 
   private async fetchAndParse(tx: number, ty: number): Promise<T | null> {
