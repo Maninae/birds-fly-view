@@ -20,6 +20,15 @@
 import { Vector2 } from 'three';
 import { ringCentroid } from './geometryUtils';
 
+/**
+ * Ratio-based rise clamp. A residential gable rarely exceeds ~50% of the
+ * footprint short side; an HVAC cluster or roof deck classified as HIP would
+ * otherwise spike to a giant peak, which reads as a mountain, not a house.
+ */
+const MAX_RISE_TO_SHORT_SIDE = 0.5;
+/** Absolute rise ceiling: 12 m covers a proper Victorian mansard. */
+const MAX_RISE_M = 12;
+
 /** Emit pitched-roof triangles onto the ROOF buffer arrays.
  *
  * The caller has already computed `outer` (footprint outer ring), the eave
@@ -38,8 +47,23 @@ export function emitPitchedRoof(
   roofCol: number[],
   roofIdx: number[],
 ): void {
-  const rise = rec.rise_dm / 10;
+  let rise = rec.rise_dm / 10;
   if (rise <= 0 || outer.length < 3) return;
+
+  // Clamp absurd rises (rooftop HVAC/decks classified as hips would peak
+  // like a mountain). Cap at half the footprint short side AND an
+  // absolute ceiling that covers a proper Victorian mansard.
+  let minX = outer[0].x, maxX = outer[0].x;
+  let minZ = outer[0].y, maxZ = outer[0].y;
+  for (let i = 1; i < outer.length; i++) {
+    const p = outer[i];
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minZ) minZ = p.y; if (p.y > maxZ) maxZ = p.y;
+  }
+  const shortSide = Math.min(maxX - minX, maxZ - minZ);
+  const capByFootprint = shortSide * MAX_RISE_TO_SHORT_SIDE;
+  if (rise > capByFootprint) rise = capByFootprint;
+  if (rise > MAX_RISE_M) rise = MAX_RISE_M;
 
   const c = ringCentroid(outer);
   const ridgeAz = rec.ridge_cdeg / 100;
@@ -51,7 +75,7 @@ export function emitPitchedRoof(
     const az = (ridgeAz * Math.PI) / 180;
     const dirX = Math.sin(az);
     const dirZ = -Math.cos(az);      // compass 0 = +north = -Z in ENU
-    emitGable(outer, c.x, c.z, dirX, dirZ, eaveY, eaveY + rise,
+    emitGable(outer, c.x, c.z, dirX, dirZ, eaveY, eaveY + rise, minX, maxX, minZ, maxZ,
               roofColor, roofPos, roofNor, roofCol, roofIdx);
     return;
   }
@@ -66,19 +90,13 @@ function emitGable(
   cx: number, cz: number,
   dirX: number, dirZ: number,
   eaveY: number, ridgeY: number,
+  minX: number, maxX: number, minZ: number, maxZ: number,
   color: { r: number; g: number; b: number },
   pos: number[], nor: number[], col: number[], idx: number[],
 ): void {
   // Clip the ridge line through (cx,cz) in direction (dirX,dirZ) to the
   // outer ring's bounding box. Simple axis-aligned clip is enough since
   // the mesh is stylized.
-  let minX = outer[0].x, maxX = outer[0].x;
-  let minZ = outer[0].y, maxZ = outer[0].y;
-  for (let i = 1; i < outer.length; i++) {
-    const p = outer[i];
-    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-    if (p.y < minZ) minZ = p.y; if (p.y > maxZ) maxZ = p.y;
-  }
   const tAt = (x: number, z: number) => {
     let tMin = -Infinity, tMax = Infinity;
     if (Math.abs(dirX) > 1e-6) {
