@@ -127,12 +127,19 @@ export class TileStreamer {
    */
   private collisionCache: TileCollision[] | null = null;
 
-  constructor(builder: TileBuilder, readyGate?: TileReadyGate) {
+  constructor(
+    builder: TileBuilder,
+    readyGate?: TileReadyGate,
+    onEvict?: (tx: number, ty: number) => void,
+  ) {
     this.root = new Group();
     this.root.name = 'stylized-vector-tiles';
     this.builder = builder;
     this.readyGate = readyGate;
+    this.onEvict = onEvict;
   }
+
+  private onEvict?: (tx: number, ty: number) => void;
 
   setFrame(frame: EnuFrame): void { this.frame = frame; }
 
@@ -323,6 +330,14 @@ export class TileStreamer {
     this.disposeSubtree(entry.root);
     this.root.remove(entry.root);
     this.tiles.delete(k);
+    // External-hook (Phase 2): drop per-tile roof lookups + roof JSON so
+    // memory doesn't accumulate as the ring turns over.
+    if (this.onEvict) {
+      const slash = k.indexOf('/');
+      const tx = +k.slice(0, slash);
+      const ty = +k.slice(slash + 1);
+      this.onEvict(tx, ty);
+    }
   }
 
   /**

@@ -18,7 +18,7 @@ import { Color, Vector2 } from 'three';
 import type { VectorTileLayer } from '@mapbox/vector-tile';
 import { EnuFrame } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
-import { parseBuildingHeights, sanityCheckHeight } from './buildingHeights';
+import { lidarEaveIsTrustworthy, parseBuildingHeights, sanityCheckHeight } from './buildingHeights';
 import {
   extractPolygons, appendPolygonFlat, featureAnchorInTile,
   ringArea, ringBounds, ringCentroid, ProjectedPoly,
@@ -28,6 +28,16 @@ import {
 } from './palette';
 import type { EdgeDedupe } from './tileStreamer';
 import { WINDOW_PITCH_H_M, WINDOW_PITCH_V_M } from './windowTexture';
+import { emitPitchedRoof } from './pitchedRoof';
+import type { RoofRecord } from './geodata/types';
+
+/**
+ * Optional roof-record lookup for a tile. When set, the extruder consults it
+ * by footprint centroid; a hit overrides OSM height with LiDAR eave and
+ * emits a stylized pitched roof above. A miss falls back to the flat-prism
+ * path (byte-identical to Phase 1).
+ */
+export type RoofLookupFn = (worldX: number, worldZ: number) => RoofRecord | null;
 
 /**
  * Called for every extruded building BEFORE the wall-edge dedupe runs. The
@@ -96,6 +106,11 @@ export function buildBuildingBuffers(
    * party wall — party walls still separate two SOLID prisms.
    */
   prismSink?: PrismSink,
+  /**
+   * Optional Phase-2 roof-record lookup keyed by footprint centroid in
+   * world XZ. Hit = pitched roof + LiDAR eave; miss = flat-prism (Phase 1).
+   */
+  roofLookup?: RoofLookupFn,
 ): BuildingBufferData | null {
   // Emit walls into their own array first (every quad is exactly 4 verts,
   // so the whole wall section is naturally 4-aligned) and roofs into a
@@ -167,7 +182,20 @@ export function buildBuildingBuffers(
       // Footprint-aware height sanity — clamp bogus OSM rows before we
       // extrude a spike over SoMa or a multi-block slab over the Sunset.
       const areaM2 = ringArea(poly.outer);
-      const safeHeight = sanityCheckHeight(heights.height, areaM2);
+      let safeHeight = sanityCheckHeight(heights.height, areaM2);
+      // Phase 2: prefer LiDAR eave from the roof bake when the footprint
+      // centroid matches a record within tolerance. This override applies
+      // to BOTH the wall top (safeHeight) and the pitched roof mesh.
+      const roofRec = roofLookup ? roofLookup(c.x, c.z) : null;
+      if (roofRec) {
+        const eaveM = roofRec.eave_dm / 10;
+        // Bake-quality guard: an implausibly low LiDAR eave keeps the OSM
+        // wall height (see lidarEaveIsTrustworthy); the pitched roof from
+        // the record still renders on top of whichever wall top wins.
+        if (lidarEaveIsTrustworthy(eaveM, safeHeight)) {
+          safeHeight = sanityCheckHeight(eaveM, areaM2);
+        }
+      }
       const baseY = minGroundY - BASE_SINK_M + heights.base;
       const topY = centroidY + safeHeight;
 
@@ -204,6 +232,16 @@ export function buildBuildingBuffers(
       // window pattern only ever shows on the walls.
       const roofVertsBefore = roofPos.length / 3;
       appendPolygonFlat(poly, topY, roofC, roofPos, roofNor, roofCol, roofIdx);
+      // Phase 2: if we matched a pitched roof record, emit the ridge / hip
+      // geometry ABOVE the flat top-face. The flat cap stays, so the pitched
+      // triangles overlay it and the interior stays sealed even when the
+      // ridge azimuth clips oddly.
+      if (roofRec && roofRec.shape !== 0 && roofRec.rise_dm > 0) {
+        emitPitchedRoof(
+          poly.outer, topY, roofRec, roofC,
+          roofPos, roofNor, roofCol, roofIdx,
+        );
+      }
       const roofVertsAdded = roofPos.length / 3 - roofVertsBefore;
       for (let k = 0; k < roofVertsAdded; k++) roofUv.push(0, 0);
       count++;

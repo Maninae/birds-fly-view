@@ -20,10 +20,11 @@ import type { VectorTile } from '@mapbox/vector-tile';
 import { EnuFrame, tileXToLon, tileYToLat } from '../geo/mercator';
 import { TerrainSampler } from '../geo/terrain';
 import type { EdgeDedupe } from './tileStreamer';
-import { buildBuildingBuffers } from './buildingMesh';
+import { buildBuildingBuffers, type RoofLookupFn } from './buildingMesh';
 import { buildBridgeBuffers } from './bridges';
 import {
   buildRoadBuffers, buildWaterBuffers, buildGreenBuffers,
+  type WashSampleFn,
 } from './surfaceMesh';
 import { buildTreeInstances } from './trees';
 import { TileCollisionBuilder, type TileCollision } from './collision';
@@ -44,6 +45,16 @@ export interface TileMaterials {
 export interface TileBuilderExtras {
   /** Return true to suppress procedural scatter for this z14 tile. */
   skipProceduralTreesFor?: (tx: number, ty: number) => boolean;
+  /**
+   * Phase 2: return the roof-lookup for this z14 tile, or null if no bake
+   * covers it. The lookup answers per-footprint centroid queries in O(1).
+   */
+  roofLookupFor?: (tx: number, ty: number) => RoofLookupFn | null;
+  /**
+   * Phase 2: NAIP wash sampler. When present and covered, `buildGreenBuffers`
+   * multiplies each polygon's tint by the wash color at its centroid.
+   */
+  washSample?: WashSampleFn;
 }
 
 /**
@@ -104,11 +115,13 @@ export function buildTilePayload(
   // WorldSource restrict `groundBelow`'s raycast to just these meshes,
   // so trees/roads/water/greens never register as "perchable rooftops".
   if (building) {
+    const roofLookup = extras.roofLookupFor?.(tx, ty) ?? null;
     const data = buildBuildingBuffers(
       building, tx, ty, tz, frame, terrain, edges,
       (outer, holes, baseY, topY) => {
         collision.addPrismFromV2(outer, holes, baseY, topY);
       },
+      roofLookup ?? undefined,
     );
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.buildingMat);
@@ -131,7 +144,7 @@ export function buildTilePayload(
 
   // Green land (parks + wood/grass landcover).
   if (park || landcover || landuse) {
-    const data = buildGreenBuffers({ park, landcover, landuse }, tx, ty, tz, frame, terrain);
+    const data = buildGreenBuffers({ park, landcover, landuse }, tx, ty, tz, frame, terrain, extras.washSample);
     if (data) {
       const mesh = new Mesh(makeGeometry(data), mats.greenMat);
       mesh.name = 'greens';

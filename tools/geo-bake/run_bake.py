@@ -16,8 +16,10 @@ import time
 from pathlib import Path
 
 from bake_paint import emit_paint_tiles
+from bake_roofs import bake_roofs_for_tiles
 from bake_terrain import bake_terrain_for_bboxes
 from bake_trees import bake_trees_for_tiles
+from bake_wash import bake_wash_for_tiles
 from geolib_shim import (
     bbox_3857_of_lonlat_bbox,
     fetch_ept_root,
@@ -29,10 +31,18 @@ from osm_paint import bbox_of_lonlat_bbox, extract_paint, query_paint
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
 logger = logging.getLogger('run_bake')
 
-# Two demo bboxes for PAINT (per Phase 1 spec):
+# Phase 1 paint zones.
 FB_BBOX = (-122.408, 37.7860, -122.386, 37.8020)          # Embarcadero + FB
 GGP_BBOX = (-122.4795, 37.7620, -122.4400, 37.7810)       # GGP east + Panhandle
-DEMO_LONLAT_BBOXES = [FB_BBOX, GGP_BBOX]
+# Phase 2 paint zones.
+MISSION_BBOX = (-122.4265, 37.7480, -122.4055, 37.7690)   # Mission
+NORTH_BEACH_CHINATOWN_BBOX = (-122.4165, 37.7935, -122.4000, 37.8080)
+HAYES_ALAMO_BBOX = (-122.4405, 37.7695, -122.4200, 37.7830)
+CASTRO_BBOX = (-122.4425, 37.7550, -122.4285, 37.7695)
+DEMO_LONLAT_BBOXES = [
+    FB_BBOX, GGP_BBOX,
+    MISSION_BBOX, NORTH_BEACH_CHINATOWN_BBOX, HAYES_ALAMO_BBOX, CASTRO_BBOX,
+]
 
 # SF proper coverage bbox for TREES + TERRAIN (workunit conforming bounds
 # rounded to a rectangle over the peninsula).
@@ -99,6 +109,28 @@ def bake_layer_terrain(laz_paths: list[Path], out_root: Path) -> tuple[list[tupl
     return bake_terrain_for_bboxes([SF_PROPER_BBOX], laz_paths, out_root)
 
 
+def bake_layer_roofs(laz_paths: list[Path], out_root: Path) -> tuple[list[tuple[int, int]], int, int]:
+    """Bake z14 roof records for every tile covering SF proper.
+
+    Tiles without enough cached LAZ coverage are silently skipped by the
+    per-tile density gate (the runtime falls back to flat-prism extrusion).
+    """
+    tiles = sorted(set(tiles_covering_bbox(*SF_PROPER_BBOX, 14)))
+    logger.info('roofs layer target: %d z14 tiles across SF proper', len(tiles))
+    return bake_roofs_for_tiles(tiles, laz_paths, out_root, zoom=14)
+
+
+def bake_layer_wash(out_root: Path) -> tuple[list[tuple[int, int]], int]:
+    """Bake NAIP-derived, dream-warmed wash tiles over SF proper.
+
+    Only tiles the NAIP service serves get a file; missing tiles fall back
+    to the current dream palette unchanged.
+    """
+    tiles = sorted(set(tiles_covering_bbox(*SF_PROPER_BBOX, 14)))
+    logger.info('wash layer target: %d z14 tiles across SF proper', len(tiles))
+    return bake_wash_for_tiles(tiles, out_root, zoom=14)
+
+
 def write_manifest(out_root: Path) -> int:
     """Manifest is a pure function of DISK state, never of what this run baked.
 
@@ -115,11 +147,19 @@ def write_manifest(out_root: Path) -> int:
             for f in xd.iterdir() if f.suffix == ext
         )
 
-    payload = {
+    payload: dict = {
         'trees':   {'zoom': 14, 'tiles': scan('trees', 14, '.json')},
         'terrain': {'zoom': 16, 'tiles': scan('terrain', 16, '.png')},
         'paint':   {'zoom': 14, 'tiles': scan('paint', 14, '.json')},
     }
+    # Phase 2 optional layers: only include the key if the layer bake actually
+    # wrote files. Absent key = phase-1 runtime behavior for that layer.
+    roofs_tiles = scan('roofs', 14, '.json')
+    if roofs_tiles:
+        payload['roofs'] = {'zoom': 14, 'tiles': roofs_tiles}
+    wash_tiles = scan('wash', 14, '.png')
+    if wash_tiles:
+        payload['wash'] = {'zoom': 14, 'tiles': wash_tiles}
     path = out_root / 'manifest.json'
     text = json.dumps(payload, indent=2)
     path.write_text(text)
@@ -133,7 +173,7 @@ def main() -> None:
     parser.add_argument('--laz-cache', type=Path, action='append',
                         help='LAZ cache dir; can be repeated.', default=None)
     parser.add_argument('--layers', default='trees,terrain,paint',
-                        help='comma-separated: trees,terrain,paint')
+                        help='comma-separated subset of: trees,terrain,paint,roofs,wash')
     args = parser.parse_args()
 
     out_root = args.out_root
@@ -147,7 +187,7 @@ def main() -> None:
     layers = set(args.layers.split(','))
 
     t0 = time.time()
-    if layers & {'trees', 'terrain'}:
+    if layers & {'trees', 'terrain', 'roofs'}:
         assert_cache_complete(args.laz_cache or [])
 
     if 'paint' in layers:
@@ -162,6 +202,15 @@ def main() -> None:
     if 'terrain' in layers:
         terrain_tiles, terrain_bytes = bake_layer_terrain(laz_paths, out_root / 'terrain')
         logger.info('terrain: %d tiles, %.1f KB', len(terrain_tiles), terrain_bytes / 1024)
+
+    if 'roofs' in layers:
+        roof_tiles, n_roofs, roof_bytes = bake_layer_roofs(laz_paths, out_root / 'roofs')
+        logger.info('roofs: %d tiles, %d roofs, %.1f KB',
+                    len(roof_tiles), n_roofs, roof_bytes / 1024)
+
+    if 'wash' in layers:
+        wash_tiles, wash_bytes = bake_layer_wash(out_root / 'wash')
+        logger.info('wash: %d tiles, %.1f KB', len(wash_tiles), wash_bytes / 1024)
 
     manifest_bytes = write_manifest(out_root)
     logger.info('manifest: %d bytes', manifest_bytes)

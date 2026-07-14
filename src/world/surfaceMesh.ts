@@ -240,6 +240,10 @@ export function buildWaterBuffers(
 
 // ── Green land polygons ────────────────────────────────────────────────────
 
+/** Return a wash multiplier (r,g,b in [0,2]) for a lat/lon, or null if
+ *  no wash coverage / not yet loaded. Multiplied per polygon at centroid. */
+export type WashSampleFn = (lat: number, lon: number) => { r: number; g: number; b: number } | null;
+
 /** Union of park + landcover(wood/grass/sand/wetland) tinted regions for one tile. */
 export function buildGreenBuffers(
   layers: {
@@ -250,6 +254,7 @@ export function buildGreenBuffers(
   tileX: number, tileY: number, tileZ: number,
   frame: EnuFrame,
   terrain: TerrainSampler,
+  washSample?: WashSampleFn,
 ): BufferData | null {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -271,7 +276,19 @@ export function buildGreenBuffers(
       const c = ringCentroid(poly.outer);
       const geo = frame.enuToGeo(c.x, c.z);
       const groundY = terrain.sampleMeshY(geo.lat, geo.lon);
-      appendPolygonFlat(poly, groundY + GREEN_DRAPE, color, positions, normals, colors, indices);
+      // Phase 2 wash: multiply per-polygon color by the wash sample at
+      // centroid so parks/beaches carry a subtle NAIP-derived warmth.
+      // No wash coverage = untouched color (identical to Phase 1).
+      let stampColor = color;
+      if (washSample) {
+        const w = washSample(geo.lat, geo.lon);
+        if (w) {
+          stampColor = new Color(
+            color.r * w.r, color.g * w.g, color.b * w.b,
+          );
+        }
+      }
+      appendPolygonFlat(poly, groundY + GREEN_DRAPE, stampColor, positions, normals, colors, indices);
       hit++;
     }
   };
