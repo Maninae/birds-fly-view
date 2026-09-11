@@ -10,6 +10,11 @@ function boot(): void {
   const canvas = document.getElementById('bfv-canvas') as HTMLCanvasElement | null;
   if (!canvas) throw new Error('missing #bfv-canvas');
 
+  // The static SEO/no-JS hero lives above the canvas until the app is ready to
+  // paint. Real content for crawlers and JS-disabled viewers; the app's own
+  // title overlay takes over the moment we boot.
+  document.getElementById('bfv-seo-hero')?.remove();
+
   // #key= magic link must be consumed before App builds: the world switcher
   // reads the stored key at construction to default to photoreal.
   const magicKeyStored = consumeMagicKey();

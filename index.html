@@ -34,8 +34,97 @@
     <meta name="twitter:image" content="https://maninae.github.io/birds-fly-view/social-card.png" />
 
     <link rel="icon" type="image/svg+xml" href="/birds-fly-view/favicon.svg" />
+
+    <style>
+      /* Static intro shown until the JS app boots. Matches the app's golden-hour
+         palette so the transition from this hero to the sky/title overlay is
+         seamless. Any visitor without JS sees a real page (h1 + paragraph +
+         hub footer) — this is the crawlable and no-JS render. */
+      html, body { margin: 0; padding: 0; height: 100%; background: #F5E3C8; color: #3A3730; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+      }
+      #bfv-seo-hero {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(ellipse at 50% 82%, rgba(255, 236, 194, 0.55), transparent 60%),
+          linear-gradient(180deg, #6EA3D9 0%, #9EC4E4 42%, #D9E8F1 82%, #EFEAD6 100%);
+        overflow-y: auto;
+      }
+      #bfv-seo-hero .bfv-seo-inner {
+        max-width: 620px;
+        width: 100%;
+        text-align: center;
+        padding: 22px 24px 20px;
+        background: rgba(255, 253, 246, 0.85);
+        border: 1px solid rgba(58, 55, 48, 0.14);
+        border-radius: 18px;
+        box-shadow: 0 12px 40px rgba(58, 55, 48, 0.22);
+      }
+      #bfv-seo-hero h1 {
+        font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Book Antiqua', Georgia, serif;
+        font-size: clamp(28px, 4.4vw, 44px);
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+        color: #3A3730;
+        margin: 0 0 10px;
+      }
+      #bfv-seo-hero .bfv-seo-lead {
+        font-size: clamp(14px, 1.7vw, 17px);
+        line-height: 1.55;
+        color: rgba(58, 55, 48, 0.78);
+        margin: 0 0 14px;
+      }
+      #bfv-seo-hero .bfv-seo-loading {
+        font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Book Antiqua', Georgia, serif;
+        font-style: italic;
+        font-size: 14px;
+        color: rgba(58, 55, 48, 0.55);
+        margin: 4px 0 0;
+      }
+      #bfv-seo-hero .bfv-seo-footer {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(58, 55, 48, 0.14);
+        font-size: 12px;
+        color: rgba(58, 55, 48, 0.55);
+      }
+      #bfv-seo-hero .bfv-seo-footer a {
+        color: #C97B5A;
+        text-decoration: none;
+      }
+      #bfv-seo-hero .bfv-seo-footer a:hover { text-decoration: underline; }
+      @media (max-width: 520px) {
+        #bfv-seo-hero .bfv-seo-inner { padding: 20px 16px 18px; }
+      }
+    </style>
   </head>
   <body>
+    <div id="bfv-seo-hero" role="region" aria-label="birds-fly-view intro">
+      <div class="bfv-seo-inner">
+        <h1>Fly the Bay Area as a bird in 3D</h1>
+        <p class="bfv-seo-lead">
+          Type any Bay Area address and spawn as a bird above it. The world below is real: the actual
+          street grid, real building footprints at their real heights, the parks, the freeways, the Bay,
+          the hills — streamed live from OpenStreetMap and rendered as a warm golden-hour dreamworld in
+          your browser. No account, no install, no API key.
+        </p>
+        <p class="bfv-seo-loading">Loading the sky…</p>
+        <footer class="bfv-seo-footer">
+          <a href="https://maninae.github.io/">A project by Owen Wang</a>
+          <span aria-hidden="true"> · </span>
+          <a href="https://maninae.github.io/projects.html">more projects</a>
+        </footer>
+      </div>
+    </div>
     <canvas id="bfv-canvas"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
