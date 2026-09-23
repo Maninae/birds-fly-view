@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/screenshots/embarcadero.png" alt="Flying up the Embarcadero — downtown San Francisco, the piers, and the Bay" width="820">
+</p>
+
 # birds-fly-view
 
 **Become a bird and fly your real neighborhood.**
@@ -19,8 +23,6 @@ Type any Bay Area address and spawn as a bird above it. The world below is real 
 - **Land anywhere**: perch on rooftops, walk at street level, take off again
 - **Instant**: no account, no API key, no install — it's a static page
 - **Photoreal mode**: optionally paste your own Google Maps key to fly Google's photogrammetry mesh instead
-
-![Flying up the Embarcadero — downtown San Francisco, the piers, and the Bay](docs/screenshots/embarcadero.png)
 
 | Twin Peaks & Sutro Tower | Perched on a rooftop |
 |---|---|
